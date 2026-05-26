@@ -6,14 +6,17 @@ Lives at `~/.claude/skills/` so every Claude Code session in every project picks
 
 ## Install / update on a new machine — one command
 
+> **Repo ist privat.** Voraussetzung einmalig pro Gerät: [GitHub CLI](https://cli.github.com/) installieren und `gh auth login` ausführen (GitHub.com → HTTPS → Browser-Login mit dem Account, der Zugriff aufs Repo hat).
+> Der Installer ruft danach intern `gh auth setup-git` auf, damit auch `git pull/clone` über den gh-Credential-Helper läuft — kein PAT im Klartext.
+
 ### macOS / Linux / Windows-Git-Bash
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Cem-Tas96/claude-skills/main/install.sh | bash
+gh api repos/Cem-Tas96/claude-skills/contents/install.sh -H "Accept: application/vnd.github.raw" | bash
 ```
 
 ### Windows PowerShell
 ```powershell
-iex (iwr https://raw.githubusercontent.com/Cem-Tas96/claude-skills/main/install.ps1).Content
+gh api repos/Cem-Tas96/claude-skills/contents/install.ps1 -H "Accept: application/vnd.github.raw" | iex
 ```
 
 That's it. The installer:

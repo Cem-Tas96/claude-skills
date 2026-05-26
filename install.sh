@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Claude Code skills installer / updater for macOS, Linux, and Windows-Git-Bash.
-# One-liner: curl -fsSL https://raw.githubusercontent.com/Cem-Tas96/claude-skills/main/install.sh | bash
+# Private repo — needs `gh` CLI authenticated (run `gh auth login` once).
+# One-liner:
+#   gh api repos/Cem-Tas96/claude-skills/contents/install.sh -H "Accept: application/vnd.github.raw" | bash
 set -euo pipefail
 
-REPO_URL="https://github.com/Cem-Tas96/claude-skills.git"
+REPO_SLUG="Cem-Tas96/claude-skills"
+REPO_URL="https://github.com/${REPO_SLUG}.git"
 SKILLS_DIR="$HOME/.claude/skills"
 SETTINGS="$HOME/.claude/settings.json"
 CLAUDE_MD="$HOME/.claude/CLAUDE.md"
@@ -11,6 +14,17 @@ CLAUDE_MD="$HOME/.claude/CLAUDE.md"
 say() { printf '\033[36m→\033[0m %s\n' "$*"; }
 ok()  { printf '\033[32m✓\033[0m %s\n' "$*"; }
 warn(){ printf '\033[33m!\033[0m %s\n' "$*" >&2; }
+die() { printf '\033[31m✗\033[0m %s\n' "$*" >&2; exit 1; }
+
+# 0. Preflight — gh CLI required because the repo is private
+if ! command -v gh >/dev/null 2>&1; then
+  die "GitHub CLI (gh) not found. Install it: https://cli.github.com/  then run: gh auth login"
+fi
+if ! gh auth status >/dev/null 2>&1; then
+  die "gh is not logged in. Run: gh auth login  (choose GitHub.com → HTTPS → authenticate)"
+fi
+# Make sure git can clone/pull the private repo via gh's credential helper
+gh auth setup-git >/dev/null 2>&1 || true
 
 # 1. Clone or pull skills repo
 mkdir -p "$HOME/.claude"
@@ -22,11 +36,11 @@ elif [ -d "$SKILLS_DIR" ] && [ -n "$(ls -A "$SKILLS_DIR" 2>/dev/null)" ]; then
   warn "Existing $SKILLS_DIR backed up to $BACKUP"
   mv "$SKILLS_DIR" "$BACKUP"
   say "Cloning skills repo..."
-  git clone --quiet "$REPO_URL" "$SKILLS_DIR"
+  gh repo clone "$REPO_SLUG" "$SKILLS_DIR" -- --quiet
 else
   rm -rf "$SKILLS_DIR" 2>/dev/null || true
   say "Cloning skills repo..."
-  git clone --quiet "$REPO_URL" "$SKILLS_DIR"
+  gh repo clone "$REPO_SLUG" "$SKILLS_DIR" -- --quiet
 fi
 ok "Skills at $SKILLS_DIR"
 
@@ -70,7 +84,7 @@ else
 ## Claude Skills sync — Cem-Tas96/claude-skills
 
 <!-- claude-skills-sync:do-not-remove -->
-`~/.claude/skills/` ist ein Git-Repo (https://github.com/Cem-Tas96/claude-skills). Skills syncen automatisch via SessionStart-Hook.
+`~/.claude/skills/` ist ein Git-Repo (https://github.com/Cem-Tas96/claude-skills, **privat**). Skills syncen automatisch via SessionStart-Hook.
 
 **Natural-language Trigger** (wenn Cem das sagt, sofort ausführen — keine Rückfrage):
 
@@ -81,8 +95,9 @@ else
 - "skill <name> erstellen" / "neuen skill anlegen <name>"
   → Neuen Ordner `~/.claude/skills/<name>/` mit `SKILL.md` (YAML-Frontmatter + Inhalt) anlegen, dann committen+pushen aus `~/.claude/skills/`.
 
-**Auf neuem Gerät einrichten:** `curl -fsSL https://raw.githubusercontent.com/Cem-Tas96/claude-skills/main/install.sh | bash`
-(Windows PowerShell: `iex (iwr https://raw.githubusercontent.com/Cem-Tas96/claude-skills/main/install.ps1).Content`)
+**Auf neuem Gerät einrichten (privates Repo, braucht `gh` CLI + `gh auth login`):**
+`gh api repos/Cem-Tas96/claude-skills/contents/install.sh -H "Accept: application/vnd.github.raw" | bash`
+(Windows PowerShell: `gh api repos/Cem-Tas96/claude-skills/contents/install.ps1 -H "Accept: application/vnd.github.raw" | iex`)
 EOF
   ok "Trigger-Block in $CLAUDE_MD eingefügt"
 fi
