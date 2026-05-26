@@ -4,43 +4,48 @@ Personal skills for Claude Code, synced across all my machines (macOS + Windows)
 
 Lives at `~/.claude/skills/` so every Claude Code session in every project picks them up automatically.
 
-## First-time setup on a new machine
+## Install / update on a new machine — one command
 
-### macOS / Linux
+### macOS / Linux / Windows-Git-Bash
 ```bash
-# 1. Make sure ~/.claude exists (start Claude Code once if not)
-mkdir -p ~/.claude
-
-# 2. If ~/.claude/skills already has files (e.g. from a fresh Claude Code install),
-#    move them out of the way first:
-[ -d ~/.claude/skills ] && mv ~/.claude/skills ~/.claude/skills.bak
-
-# 3. Clone this repo into ~/.claude/skills
-git clone git@github.com:Cem-Tas96/claude-skills.git ~/.claude/skills
-# (or HTTPS: git clone https://github.com/Cem-Tas96/claude-skills.git ~/.claude/skills)
-
-# 4. Add the auto-pull hook to ~/.claude/settings.json (see "Auto-update hook" below)
+curl -fsSL https://raw.githubusercontent.com/Cem-Tas96/claude-skills/main/install.sh | bash
 ```
 
-### Windows (PowerShell)
+### Windows PowerShell
 ```powershell
-# 1. Make sure %USERPROFILE%\.claude exists
-New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claude" | Out-Null
-
-# 2. Back up any existing skills folder
-if (Test-Path "$env:USERPROFILE\.claude\skills") {
-  Move-Item "$env:USERPROFILE\.claude\skills" "$env:USERPROFILE\.claude\skills.bak"
-}
-
-# 3. Clone this repo
-git clone https://github.com/Cem-Tas96/claude-skills.git "$env:USERPROFILE\.claude\skills"
-
-# 4. Add the auto-pull hook to %USERPROFILE%\.claude\settings.json (see below)
+iex (iwr https://raw.githubusercontent.com/Cem-Tas96/claude-skills/main/install.ps1).Content
 ```
 
-## Auto-update hook
+That's it. The installer:
+1. Clones (or pulls) `~/.claude/skills/`
+2. Adds a SessionStart auto-pull hook to `~/.claude/settings.json` (idempotent — won't duplicate)
+3. Appends a natural-language trigger block to `~/.claude/CLAUDE.md` so Claude in any project recognises `"skills updaten"` / `"<skill> installieren"` and runs the right command
 
-Add this block to `~/.claude/settings.json` (or `%USERPROFILE%\.claude\settings.json` on Windows). It runs `git pull` silently every time a Claude Code session starts, so the newest skill version is always loaded.
+After install: restart Claude Code (`/exit` and reopen) so the new skills load.
+
+## Natural-language usage from inside any Claude Code session
+
+Once installed, you can just *say* any of these to Claude in any project:
+
+- **`"feature-delivery installieren"`** / **`"skills updaten"`** / **`"neuesten skill holen"`**
+  → Claude runs `git -C ~/.claude/skills pull --rebase --autostash` and tells you to restart Claude Code.
+- **`"neuen skill anlegen <name>"`** / **`"skill <name> erstellen"`**
+  → Claude scaffolds `~/.claude/skills/<name>/SKILL.md` and commits+pushes.
+
+## Editing skills
+
+1. Edit `SKILL.md` (or files in `references/`) directly in `~/.claude/skills/<skill-name>/`.
+2. Commit + push:
+   ```bash
+   git -C ~/.claude/skills add -A
+   git -C ~/.claude/skills commit -m "feat(<skill>): <what changed>"
+   git -C ~/.claude/skills push
+   ```
+3. Other machines pick it up at next Claude Code start (via the SessionStart hook), or immediately with `git -C ~/.claude/skills pull`.
+
+## How the auto-pull hook works
+
+Added to `~/.claude/settings.json` by the installer:
 
 ```json
 {
@@ -59,24 +64,7 @@ Add this block to `~/.claude/settings.json` (or `%USERPROFILE%\.claude\settings.
 }
 ```
 
-> The `|| true` makes the hook fail-safe: no internet, merge conflict, whatever — Claude Code still starts.
-
-On Windows the same command works inside Git Bash. If Claude Code on Windows uses PowerShell by default for hooks, swap to:
-
-```json
-"command": "git -C \"$env:USERPROFILE/.claude/skills\" pull --quiet --rebase --autostash; if (-not $?) { $LASTEXITCODE = 0 }"
-```
-
-## Editing skills
-
-1. Edit `SKILL.md` (or files in `references/`) directly in `~/.claude/skills/<skill-name>/`.
-2. Commit + push:
-   ```bash
-   git -C ~/.claude/skills add -A
-   git -C ~/.claude/skills commit -m "feat(<skill>): <what changed>"
-   git -C ~/.claude/skills push
-   ```
-3. Other machines pick it up at next Claude Code start (via the hook), or immediately with `git -C ~/.claude/skills pull`.
+The `|| true` makes it fail-safe: no internet, merge conflict, whatever — Claude Code still starts.
 
 ## Skills in this repo
 
