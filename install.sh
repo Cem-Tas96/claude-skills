@@ -102,6 +102,31 @@ EOF
   ok "Trigger-Block in $CLAUDE_MD eingefügt"
 fi
 
+# 4. Install claude-auto-resume shell wrapper into zshrc + bashrc (idempotent)
+WRAPPER="$SKILLS_DIR/shell/claude-auto-resume.sh"
+MARKER_BEGIN="# >>> claude-auto-resume >>>"
+MARKER_END="# <<< claude-auto-resume <<<"
+SNIPPET="${MARKER_BEGIN}
+# Auto-resume Claude Code on /exit (continues last session). Bypass: CLAUDE_NO_AUTO_RESUME=1 claude
+[ -f \"\$HOME/.claude/skills/shell/claude-auto-resume.sh\" ] && . \"\$HOME/.claude/skills/shell/claude-auto-resume.sh\"
+${MARKER_END}"
+
+if [ -f "$WRAPPER" ]; then
+  for rc_file in "$HOME/.zshrc" "$HOME/.bashrc"; do
+    # Touch the rc-file if it doesn't exist yet (zsh ist Default auf macOS Sonoma+; bash auf vielen Linux)
+    [ -e "$rc_file" ] || touch "$rc_file"
+    if grep -qF "$MARKER_BEGIN" "$rc_file" 2>/dev/null; then
+      : # block already there — keine Aktion
+    else
+      printf '\n%s\n' "$SNIPPET" >> "$rc_file"
+      ok "claude-auto-resume in $(basename "$rc_file") eingefügt"
+    fi
+  done
+else
+  warn "Wrapper-Script $WRAPPER nicht im Repo — wird beim nächsten Pull verfügbar."
+fi
+
 echo ""
 ok "Done."
 echo "  Restart Claude Code (or run /exit and reopen) to load the latest skills."
+echo "  Neue Shell-Sessions haben automatisches /exit → resume (Ctrl-C im 2s-Window = endgültig raus)."
