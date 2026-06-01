@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 # Claude Code skills installer / updater for macOS, Linux, and Windows-Git-Bash.
 # Private repo — needs `gh` CLI authenticated (run `gh auth login` once).
-# One-liner:
+#
+# For first-time setup on a new machine, use the public bootstrap instead — it
+# installs gh, drives auth login, then chains in here:
+#   curl -fsSL https://raw.githubusercontent.com/Cem-Tas96/claude-skills-installer/main/bootstrap.sh | bash
+#
+# Direct one-liner (gh must already be installed + authenticated):
 #   gh api repos/Cem-Tas96/claude-skills/contents/install.sh -H "Accept: application/vnd.github.raw" | bash
 set -euo pipefail
 
@@ -95,9 +100,9 @@ else
 - "skill <name> erstellen" / "neuen skill anlegen <name>"
   → Neuen Ordner `~/.claude/skills/<name>/` mit `SKILL.md` (YAML-Frontmatter + Inhalt) anlegen, dann committen+pushen aus `~/.claude/skills/`.
 
-**Auf neuem Gerät einrichten (privates Repo, braucht `gh` CLI + `gh auth login`):**
-`gh api repos/Cem-Tas96/claude-skills/contents/install.sh -H "Accept: application/vnd.github.raw" | bash`
-(Windows PowerShell: `gh api repos/Cem-Tas96/claude-skills/contents/install.ps1 -H "Accept: application/vnd.github.raw" | iex`)
+**Auf neuem Gerät einrichten (privates Repo — Bootstrap installiert `gh` automatisch und startet `gh auth login`):**
+- macOS/Linux/Git-Bash: `curl -fsSL https://raw.githubusercontent.com/Cem-Tas96/claude-skills-installer/main/bootstrap.sh | bash`
+- Windows PowerShell: `irm https://raw.githubusercontent.com/Cem-Tas96/claude-skills-installer/main/bootstrap.ps1 | iex`
 EOF
   ok "Trigger-Block in $CLAUDE_MD eingefügt"
 fi
