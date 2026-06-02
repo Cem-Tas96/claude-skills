@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
 # Claude Code skills installer / updater for macOS, Linux, and Windows-Git-Bash.
-# Private repo — needs `gh` CLI authenticated (run `gh auth login` once).
+# Public repo — no auth needed. Auto-installs git via brew/apt/dnf/pacman if missing.
 #
-# For first-time setup on a new machine, use the public bootstrap instead — it
-# installs gh, drives auth login, then chains in here:
-#   curl -fsSL https://raw.githubusercontent.com/Cem-Tas96/claude-skills-installer/main/bootstrap.sh | bash
-#
-# Direct one-liner (gh must already be installed + authenticated):
-#   gh api repos/Cem-Tas96/claude-skills/contents/install.sh -H "Accept: application/vnd.github.raw" | bash
+# One-liner:
+#   curl -fsSL https://raw.githubusercontent.com/Cem-Tas96/claude-skills/main/install.sh | bash
 set -euo pipefail
 
 REPO_SLUG="Cem-Tas96/claude-skills"
@@ -16,20 +12,54 @@ SKILLS_DIR="$HOME/.claude/skills"
 SETTINGS="$HOME/.claude/settings.json"
 CLAUDE_MD="$HOME/.claude/CLAUDE.md"
 
-say() { printf '\033[36m→\033[0m %s\n' "$*"; }
-ok()  { printf '\033[32m✓\033[0m %s\n' "$*"; }
-warn(){ printf '\033[33m!\033[0m %s\n' "$*" >&2; }
-die() { printf '\033[31m✗\033[0m %s\n' "$*" >&2; exit 1; }
+say()  { printf '\033[36m→\033[0m %s\n' "$*"; }
+ok()   { printf '\033[32m✓\033[0m %s\n' "$*"; }
+warn() { printf '\033[33m!\033[0m %s\n' "$*" >&2; }
+die()  { printf '\033[31m✗\033[0m %s\n' "$*" >&2; exit 1; }
 
-# 0. Preflight — gh CLI required because the repo is private
-if ! command -v gh >/dev/null 2>&1; then
-  die "GitHub CLI (gh) not found. Install it: https://cli.github.com/  then run: gh auth login"
+# 0. Ensure git is available (install via the platform's package manager if missing)
+if ! command -v git >/dev/null 2>&1; then
+  os="$(uname -s)"
+  case "$os" in
+    Darwin)
+      if command -v brew >/dev/null 2>&1; then
+        say "Installing git via Homebrew..."
+        brew install git
+      else
+        # macOS ships git via the Xcode Command Line Tools — trigger install
+        say "Triggering Xcode Command Line Tools install (provides git)..."
+        xcode-select --install || true
+        die "Run the GUI installer that just opened, then re-run this one-liner."
+      fi
+      ;;
+    Linux)
+      if command -v apt-get >/dev/null 2>&1; then
+        say "Installing git via apt..."
+        sudo apt-get update -qq && sudo apt-get install -y git
+      elif command -v dnf >/dev/null 2>&1; then
+        say "Installing git via dnf..."
+        sudo dnf install -y git
+      elif command -v pacman >/dev/null 2>&1; then
+        say "Installing git via pacman..."
+        sudo pacman -S --noconfirm git
+      elif command -v apk >/dev/null 2>&1; then
+        say "Installing git via apk..."
+        sudo apk add --no-cache git
+      else
+        die "No supported package manager (apt/dnf/pacman/apk). Install git manually: https://git-scm.com/"
+      fi
+      ;;
+    MINGW*|MSYS*|CYGWIN*)
+      die "On Windows Git-Bash, install Git for Windows manually: https://git-scm.com/download/win"
+      ;;
+    *)
+      die "Unsupported OS: $os. Install git manually: https://git-scm.com/"
+      ;;
+  esac
 fi
-if ! gh auth status >/dev/null 2>&1; then
-  die "gh is not logged in. Run: gh auth login  (choose GitHub.com → HTTPS → authenticate)"
-fi
-# Make sure git can clone/pull the private repo via gh's credential helper
-gh auth setup-git >/dev/null 2>&1 || true
+
+command -v git >/dev/null 2>&1 || die "git still not found after install attempt."
+ok "git ready ($(git --version))"
 
 # 1. Clone or pull skills repo
 mkdir -p "$HOME/.claude"
@@ -41,11 +71,11 @@ elif [ -d "$SKILLS_DIR" ] && [ -n "$(ls -A "$SKILLS_DIR" 2>/dev/null)" ]; then
   warn "Existing $SKILLS_DIR backed up to $BACKUP"
   mv "$SKILLS_DIR" "$BACKUP"
   say "Cloning skills repo..."
-  gh repo clone "$REPO_SLUG" "$SKILLS_DIR" -- --quiet
+  git clone --quiet "$REPO_URL" "$SKILLS_DIR"
 else
   rm -rf "$SKILLS_DIR" 2>/dev/null || true
   say "Cloning skills repo..."
-  gh repo clone "$REPO_SLUG" "$SKILLS_DIR" -- --quiet
+  git clone --quiet "$REPO_URL" "$SKILLS_DIR"
 fi
 ok "Skills at $SKILLS_DIR"
 
@@ -89,7 +119,7 @@ else
 ## Claude Skills sync — Cem-Tas96/claude-skills
 
 <!-- claude-skills-sync:do-not-remove -->
-`~/.claude/skills/` ist ein Git-Repo (https://github.com/Cem-Tas96/claude-skills, **privat**). Skills syncen automatisch via SessionStart-Hook.
+`~/.claude/skills/` ist ein Git-Repo (https://github.com/Cem-Tas96/claude-skills, **public, read-only für Fremde**). Skills syncen automatisch via SessionStart-Hook.
 
 **Natural-language Trigger** (wenn Cem das sagt, sofort ausführen — keine Rückfrage):
 
@@ -100,9 +130,9 @@ else
 - "skill <name> erstellen" / "neuen skill anlegen <name>"
   → Neuen Ordner `~/.claude/skills/<name>/` mit `SKILL.md` (YAML-Frontmatter + Inhalt) anlegen, dann committen+pushen aus `~/.claude/skills/`.
 
-**Auf neuem Gerät einrichten (privates Repo — Bootstrap installiert `gh` automatisch und startet `gh auth login`):**
-- macOS/Linux/Git-Bash: `curl -fsSL https://raw.githubusercontent.com/Cem-Tas96/claude-skills-installer/main/bootstrap.sh | bash`
-- Windows PowerShell: `irm https://raw.githubusercontent.com/Cem-Tas96/claude-skills-installer/main/bootstrap.ps1 | iex`
+**Auf neuem Gerät einrichten (Installer installiert git automatisch falls fehlend):**
+- Windows PowerShell: `irm https://raw.githubusercontent.com/Cem-Tas96/claude-skills/main/install.ps1 | iex`
+- macOS/Linux/Git-Bash: `curl -fsSL https://raw.githubusercontent.com/Cem-Tas96/claude-skills/main/install.sh | bash`
 EOF
   ok "Trigger-Block in $CLAUDE_MD eingefügt"
 fi
@@ -118,10 +148,9 @@ ${MARKER_END}"
 
 if [ -f "$WRAPPER" ]; then
   for rc_file in "$HOME/.zshrc" "$HOME/.bashrc"; do
-    # Touch the rc-file if it doesn't exist yet (zsh ist Default auf macOS Sonoma+; bash auf vielen Linux)
     [ -e "$rc_file" ] || touch "$rc_file"
     if grep -qF "$MARKER_BEGIN" "$rc_file" 2>/dev/null; then
-      : # block already there — keine Aktion
+      :
     else
       printf '\n%s\n' "$SNIPPET" >> "$rc_file"
       ok "claude-auto-resume in $(basename "$rc_file") eingefügt"

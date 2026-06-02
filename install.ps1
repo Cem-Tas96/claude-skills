@@ -1,52 +1,63 @@
 # Claude Code skills installer / updater for Windows PowerShell.
-# Private repo — needs `gh` CLI authenticated (run `gh auth login` once).
+# Public repo — no auth needed. Auto-installs git via winget if missing.
 #
-# For first-time setup on a new machine, use the public bootstrap instead — it
-# installs gh, refreshes PATH, drives auth login, then chains in here:
-#   irm https://raw.githubusercontent.com/Cem-Tas96/claude-skills-installer/main/bootstrap.ps1 | iex
-#
-# Direct one-liner (gh must already be installed + authenticated):
-#   gh api repos/Cem-Tas96/claude-skills/contents/install.ps1 -H "Accept: application/vnd.github.raw" | iex
+# One-liner:
+#   irm https://raw.githubusercontent.com/Cem-Tas96/claude-skills/main/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 
 $RepoSlug   = "Cem-Tas96/claude-skills"
-$SkillsDir  = Join-Path $env:USERPROFILE ".claude\skills"
-$Settings   = Join-Path $env:USERPROFILE ".claude\settings.json"
-$ClaudeMd   = Join-Path $env:USERPROFILE ".claude\CLAUDE.md"
+$RepoUrl    = "https://github.com/$RepoSlug.git"
 $ClaudeRoot = Join-Path $env:USERPROFILE ".claude"
+$SkillsDir  = Join-Path $ClaudeRoot "skills"
+$Settings   = Join-Path $ClaudeRoot "settings.json"
+$ClaudeMd   = Join-Path $ClaudeRoot "CLAUDE.md"
 
-function Say($msg) { Write-Host "-> $msg" -ForegroundColor Cyan }
-function OK ($msg) { Write-Host "[OK] $msg" -ForegroundColor Green }
-function Warn($msg){ Write-Host "[!] $msg" -ForegroundColor Yellow }
-function Die ($msg){ Write-Host "[X] $msg" -ForegroundColor Red; exit 1 }
+function Say($msg)  { Write-Host "-> $msg" -ForegroundColor Cyan }
+function OK($msg)   { Write-Host "[OK] $msg" -ForegroundColor Green }
+function Warn($msg) { Write-Host "[!] $msg"  -ForegroundColor Yellow }
+function Die($msg)  { Write-Host "[X] $msg"  -ForegroundColor Red; exit 1 }
 
-# 0. Preflight — gh CLI required because the repo is private
-if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
-  Die "GitHub CLI (gh) not found. Install: https://cli.github.com/  then run: gh auth login"
+function Update-Path {
+  $machine = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+  $user    = [System.Environment]::GetEnvironmentVariable("Path", "User")
+  $env:Path = "$machine;$user"
 }
-& gh auth status *> $null
-if ($LASTEXITCODE -ne 0) {
-  Die "gh is not logged in. Run: gh auth login  (choose GitHub.com -> HTTPS -> authenticate)"
+
+# 0. Ensure git is available in this session (install via winget if missing)
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) { Update-Path }
+
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+  if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+    Die "Neither git nor winget found. Install Git manually: https://git-scm.com/download/win"
+  }
+  Say "Installing Git via winget..."
+  winget install --id Git.Git --silent --accept-source-agreements --accept-package-agreements | Out-Null
+  if ($LASTEXITCODE -ne 0) { Die "winget install failed. Install Git manually: https://git-scm.com/download/win" }
+  Update-Path
 }
-& gh auth setup-git *> $null
+
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+  Die "git still not found after install. Close this terminal, open a new one, and re-run the one-liner."
+}
+OK "git ready ($(& git --version))"
 
 # 1. Clone or pull skills repo
 New-Item -ItemType Directory -Force -Path $ClaudeRoot | Out-Null
 
 if (Test-Path (Join-Path $SkillsDir ".git")) {
   Say "Pulling latest skills..."
-  git -C $SkillsDir pull --quiet --rebase --autostash
+  & git -C $SkillsDir pull --quiet --rebase --autostash
 } elseif ((Test-Path $SkillsDir) -and ((Get-ChildItem $SkillsDir -Force | Measure-Object).Count -gt 0)) {
   $backup = "$SkillsDir.bak.$([int64](Get-Date -UFormat %s))"
   Warn "Existing $SkillsDir backed up to $backup"
   Move-Item $SkillsDir $backup
   Say "Cloning skills repo..."
-  gh repo clone $RepoSlug $SkillsDir -- --quiet
+  & git clone --quiet $RepoUrl $SkillsDir
 } else {
   if (Test-Path $SkillsDir) { Remove-Item -Recurse -Force $SkillsDir }
   Say "Cloning skills repo..."
-  gh repo clone $RepoSlug $SkillsDir -- --quiet
+  & git clone --quiet $RepoUrl $SkillsDir
 }
 OK "Skills at $SkillsDir"
 
@@ -92,7 +103,7 @@ if (-not $alreadyHas) {
 ## Claude Skills sync — Cem-Tas96/claude-skills
 
 $marker
-`~/.claude/skills/`` ist ein Git-Repo (https://github.com/Cem-Tas96/claude-skills, **privat**). Skills syncen automatisch via SessionStart-Hook.
+``~/.claude/skills/`` ist ein Git-Repo (https://github.com/Cem-Tas96/claude-skills, **public, read-only für Fremde**). Skills syncen automatisch via SessionStart-Hook.
 
 **Natural-language Trigger** (wenn Cem das sagt, sofort ausführen — keine Rückfrage):
 
@@ -103,9 +114,9 @@ $marker
 - "skill <name> erstellen" / "neuen skill anlegen <name>"
   → Neuen Ordner ``~/.claude/skills/<name>/`` mit ``SKILL.md`` (YAML-Frontmatter + Inhalt) anlegen, dann committen+pushen aus ``~/.claude/skills/``.
 
-**Auf neuem Gerät einrichten (privates Repo — Bootstrap installiert ``gh`` automatisch und startet ``gh auth login``):**
-- macOS/Linux/Git-Bash: ``curl -fsSL https://raw.githubusercontent.com/Cem-Tas96/claude-skills-installer/main/bootstrap.sh | bash``
-- Windows PowerShell: ``irm https://raw.githubusercontent.com/Cem-Tas96/claude-skills-installer/main/bootstrap.ps1 | iex``
+**Auf neuem Gerät einrichten (Installer installiert git automatisch falls fehlend):**
+- Windows PowerShell: ``irm https://raw.githubusercontent.com/Cem-Tas96/claude-skills/main/install.ps1 | iex``
+- macOS/Linux/Git-Bash: ``curl -fsSL https://raw.githubusercontent.com/Cem-Tas96/claude-skills/main/install.sh | bash``
 "@
   Add-Content -Path $ClaudeMd -Value $block -Encoding UTF8
   OK "Trigger-Block in $ClaudeMd eingefügt"
