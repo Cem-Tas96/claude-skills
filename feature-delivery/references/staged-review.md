@@ -33,6 +33,24 @@ Gleiches Prinzip wie `multi-agent.md` §1: nicht „immer", sondern an die Blast
 
 ---
 
+## 1.5 Severity-Kalibrierung & SHA-Anker (für beide Stufen)
+
+**Severity je Befund** — Reviewer-Output dreistufig statt nur „blockierend/nicht", gegen Über-Blocking:
+
+| Severity | blockiert bei | Beispiele |
+|---|---|---|
+| **CRITICAL** | allen Tiers | Akzeptanz-Kriterium nicht erfüllt · Security/Payment-Lücke · unbehandelter Fehler-/Falsy-Fall auf kritischem Pfad · fehlende Reverse-/Counter-Mail |
+| **IMPORTANT** | nur NO-FAIL | Duplizierung existierender Logik · Idiom-Bruch der Wartung hemmt · Race im Edge-Szenario · unvollständige Spec-Quelle |
+| **MINOR** | nie | Lesbarkeit/Naming ohne Wartungs-Folge · Kommentar-Genauigkeit · Stil-Varianz |
+
+Auflösungs-Reihenfolge: CRITICAL → IMPORTANT → MINOR. **Nicht alles ist CRITICAL** — Über-Blocking entwertet die Kategorie. (Mapping auf §2/§3: CRITICAL + IMPORTANT-bei-NO-FAIL = die bisher „blockierenden" Befunde; MINOR = dokumentieren, nicht erzwingen.)
+
+**SHA-Anker** — Reviewer-Agenten erhalten die **exakte Diff-Grenze** statt „der Diff": `BASE_SHA..HEAD_SHA`, vom Orchestrator vor dem Fan-out ermittelt (`git merge-base <default> HEAD` → BASE · `git rev-parse HEAD` → HEAD). So ist die Review reproduzierbar; ein Befund auf einer Zeile **außerhalb** der Range ist per Definition Halluzination (greift ins §3-Gate). `BASE_SHA`/`HEAD_SHA` im Delivery-Report festhalten. *Projekt-agnostisch — reine git-Mechanik; kein Git → die Anker entfallen, Review läuft gegen den Working-Diff.*
+
+> Beide Prompt-Vorlagen unten erhalten zusätzlich die Zeile: *„Die Änderung umfasst nur `BASE_SHA..HEAD_SHA`; Zeilen, die in BASE_SHA unverändert existieren, sind außerhalb der Review. Versieh jeden Befund mit Severity (CRITICAL|IMPORTANT|MINOR)."*
+
+---
+
 ## 2. Stufe 1 — Spec-Compliance-Reviewer
 
 **Input:** P0-Contract (Auftrag + Akzeptanz-Kriterien) + Spec-Source-of-Truth-Quellen (P1.8) + git-Diff. **Kein** Ledger — diese Linse prüft *gegen die Absicht*, nicht gegen die eigene Stellen-Liste.

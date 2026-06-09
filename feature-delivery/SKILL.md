@@ -82,6 +82,7 @@ Dieser Skill ist der **äußere Loop** (vollständig & korrekt bauen). `/feature
    PRE-FLIGHT  Threat-Intel-Refresh (1×/Tag: neueste CVEs/Angriffe → Exposure-Check)
                + Branch-Safety-Gate (Arbeits-Branch oder dokumentierter Consent)
                + WIP-Scan (Dummy/Placeholder/Mock/TODO im berührten Code)
+               + Grün-Baseline-Gate (existierende Suite vor dem Edit grün, wenn nicht trivial)
         ↓
    P0  Auftrags-Contract
    P1  Blast-Radius → Coverage-Ledger
@@ -184,6 +185,17 @@ Wenn `/feature-testing` im Projekt nicht verfügbar ist: Phase 5 trotzdem durchf
 
 > 🚨 **Historischer Miss:** „Hab das damals auf Dummy-Basis schnell gebaut" → ein Stripe-Plan mit zusätzlichem metered Price (`0,80 €/Einheit`) blieb live, weil im Coverage-Ledger nichts "fehlt"e. Der WIP-Scan hätte das Token `dummy|hardcoded|sample` getroffen — wäre er gelaufen.
 
+### Pre-Flight Teil 3 — GRÜN-BASELINE-GATE (nur wenn nicht trivial)
+
+> **Zweck:** Vor dem ersten Edit eine **grüne Baseline** der existierenden Tests feststellen — trennt Alt-Fehler (schon vorher rot) von neu eingeführten. Ohne Baseline maskiert ein vorab-roter Test eine echte Regression.
+
+1. **Trigger** (einer reicht): Ledger ≥ 3 Zeilen · Symmetrie-Paar · Cross-Layer-Kopplung · NO-/LOW-FAIL. Trivial / BEST-EFFORT → **entfällt** (Tempo).
+2. **Test-Scope ableiten** (stack-agnostisch): Test-Runner aus dem Manifest erkennen (`package.json` / `pyproject.toml` / `go.mod` / `Cargo.toml` / `Makefile` / …). Kein Manifest / keine Suite → `N/A — keine automatisierte Test-Suite`, weiter.
+3. **Baseline-Lauf** auf sauberem Stand; Ergebnis kurz dokumentieren (Tests gesamt · bestanden · vorab-rote). Ist die Baseline **schon rot** → ehrlich BLOCKIERT: „kann kein Delta messen, Baseline erst grün machen" — nicht auf einer kaputten Baseline weiterbauen.
+4. **Nach der Änderung** (P5.4-Sweep) das **Delta** vergleichen; jeder **neu** rote Test ist eine neue Ledger-Zeile und blockiert.
+
+> Rein lesend (führt nur Tests aus, editiert nichts). Projekt-agnostisch — Runner und Manifest aus der Projektstruktur ableiten, nicht annehmen.
+
 ---
 
 ## PHASE 0 — AUFTRAGS-CONTRACT (vor allem anderen)
@@ -226,6 +238,10 @@ Die teuersten vergessenen Stellen sind die **nicht aus einer Datei sichtbaren**.
 - **Asset-/Theme-Kopien** (Datei wird gebaut und in mehrere Zielordner kopiert).
 - **Env / Bootstrap / Realm-Init** (Werte die zur Laufzeit/Boot-Zeit injiziert werden, nicht im Code stehen).
 - **Projekt-Doku der unsichtbaren Kopplungen:** Existiert eine `CLAUDE.md`/`AGENTS.md`/`CONTRIBUTING.md` mit einer Sektion wie "Important behaviors that aren't visible from a single file" → **greppen** ob ein geändertes Symbol dort vorkommt. Wenn ja: alle dort genannten Konsumenten ins Ledger.
+
+### 1.3b Instruktions-Präzedenz (explizite Anweisung lockert nur Ermessens-Gates)
+Nennt eine **explizite** Quelle — `CLAUDE.md`/`AGENTS.md` oder eine direkte Nutzer-Ansage — eine Regel oder ein Gate, hat sie **Vorrang** vor der Default-Einstellung dieses Skills, **aber nur für Ermessens-Gates** (Risiko-Tier, Agenten-Budget, Test-/Scan-Umfang). Die Lockerung wird als Ledger-Zeile `Präzedenz-Anweisung` mit Quelle + Grund **notiert**, nie still angewandt.
+> **Nicht aufweichbar** (laufen immer, egal welche Anweisung): Threat-Intel-Refresh (Pre-flight), Anti-Halluzinations-/Ledger↔Diff-Kreuzaudit, Mail-Symmetrie bei State-Wechsel (DSGVO). Faustregel: hängt das Gate **nicht** vom Boss ab (pure Architektur/Sicherheit/Rechtspflicht) → es läuft; ist es ein Ermessens-Gate → die benannte Anweisung darf es lockern, dokumentiert.
 
 ### 1.4 Symmetrie-Inventar
 Für jede Aktion die du hinzufügst/änderst, den **Partner-Pfad** lokalisieren und ins Ledger aufnehmen:
@@ -678,6 +694,7 @@ Aus der Journey-Tabelle ableiten:
 - [ ] **Mail-Pflicht-Matrix (P2.6)** — pro Trigger im Diff ist Vorwärts- + Counter-Mail im Code belegt + in P5.7 visuell verifiziert
 - [ ] **Brand/White-Label-Sweep (P2.7)** — keine Original-Brand-Reste; CLAUDE.md-Brand-Regeln eingehalten; Mail-Templates auf Brand geprüft
 - [ ] **Agenten-Befunde verifiziert** — jede vom Sub-Agenten gemeldete Stelle am Source gegengelesen (kein blind übernommener Pfad)
+- [ ] **Instruktions-Präzedenz & Rekursions-Guard** — explizite User-/Projekt-Anweisungen gelesen, Gate-Lockerungen als `Präzedenz-Anweisung` notiert (oder `N/A`); gefächerte Agenten angewiesen, `/feature-delivery` nicht zu re-entern
 - [ ] **Ledger↔Diff-Kreuzaudit** sauber (immer außer trivial): Selbst-Audit beim schmalen LOW-FAIL, **unabhängiger Verifier** ab Risiko-Signal/NO-FAIL; bei NO-FAIL zusätzlich kalte Zweit-Ableitung (Konsens) — keine offenen (a)/(b)/(c)/(d)-Befunde
 - [ ] **Staged-Review (P5.0b)** — Spec-Compliance (under/over-built · misinterpret · unsourced) grün **vor** Code-Quality (Duplizierung · Fehlerbehandlung · Idiom · toter Pfad); ab Risiko-Signal/NO-FAIL je frischer Agent; keine offenen blockierenden Befunde
 - [ ] **Externes Review verarbeitet (falls angekommen)** — jedes Finding klassifiziert (Real/kontext-blind/halluziniert/unklar), am Source validiert (Laufzeit-Test bei Laufzeit-Bug), Pushback mit Beleg statt Diskurs, echte Bugs als E-Ledger-Zeilen (`references/receiving-review.md`)
@@ -691,6 +708,7 @@ Aus der Journey-Tabelle ableiten:
 - [ ] **Adversarial Plan-Limit-Tests (P5.6)** — jeder UI-versprochene Cap mit `limit+1` adversarial getestet; keine `LIMIT-BYPASS`-Funde
 - [ ] **Email-Template Visual Inspection (P5.7)** — jede angefasste Mail in echtem Client geöffnet, Screenshot gespeichert, Anrede + Brand + Links + Buttons funktional
 - [ ] **Multi-Repo Onboarding-Smoke (P5.8)** — bei Cross-Repo: Journey-Tabelle Schritt-für-Schritt als ✓-Liste, Webhook-Logs geprüft, Auth-Hash-Identität bestätigt
+- [ ] **Grün-Baseline-Gate (Pre-flight Teil 3, wenn nicht trivial)** — existierende Suite vor dem Edit grün dokumentiert; nach dem Change 0 neu-rote Tests (oder als Ledger-Zeile erfasst); `N/A` bei trivial / keiner Suite
 - [ ] **Regressions-Sweep** grün (bestehende Tests, Lint, Typecheck, Build)
 - [ ] **Tier-Floor-Gate** angewandt — Auth/Payment/Rollen/PII/Migration berührt → NO-FAIL gesetzt (nicht per Ermessen heruntergestuft)
 - [ ] **Rollout (P7)** für Prod-Changes belegt — rückwärtskompatibel, Kill-Switch (NO-FAIL), Rollback getestet, Observability live (oder `N/A` begründet bei rein lokalem Tooling)
@@ -871,8 +889,8 @@ Damit Disziplin nicht zur ungemessenen Ceremony wird: bei jedem Lauf im Delivery
 ## REFERENZ-DATEIEN (bei Bedarf laden)
 
 - **`references/blast-radius.md`** — Konkrete Recon-Rezepte: Symbol-Suche, Sub-Agent-Fan-out-Templates, der vollständige Cross-Layer-Kopplungs-Katalog, das Symmetrie-Paar-Katalog, die Coverage-Ledger-Vorlage. **Laden in Phase 1, immer bei nicht-trivialem Blast-Radius.**
-- **`references/multi-agent.md`** — Multi-Agent-Orchestrierung & Anti-Halluzination: Agenten-Budget nach Risiko-Tier (wie viele wann), disjunkte Stream-Schnitte, Citation-or-void + Source-Abgleich + Konsens-Gate, kalte Zweit-Ableitung, Independent-Verifier-Prompt (Red-Team Ledger↔Diff). **Laden in Phase 1.5 bei Agenten-Fan-out und Phase 5.0 bei NO-FAIL.**
-- **`references/staged-review.md`** — Zwei-Stufen-Implementierungs-Review durch frische Agenten: Spec-Compliance (under/over-built · misinterpret · unsourced) ZUERST, dann Code-Quality (Duplizierung · Fehlerbehandlung · Idiom-Bruch · toter Pfad · Lesbarkeit), mit Prompt-Vorlagen, Risiko-Gate und Fix-Re-Check-Schleife. Eigene Linse **neben** dem Ledger↔Diff-Kreuzaudit (Coverage). **Laden in Phase 5.0b ab Risiko-Signal, Pflicht bei NO-FAIL.**
+- **`references/multi-agent.md`** — Multi-Agent-Orchestrierung & Anti-Halluzination: Agenten-Budget nach Risiko-Tier (wie viele wann), **Modell-Tier pro Agent (§1.6: günstig für Recon, stark für Verifikation)**, disjunkte Stream-Schnitte, **Subagent-Rekursions-Guard (§2b)**, Citation-or-void + Source-Abgleich + Konsens-Gate, kalte Zweit-Ableitung, Independent-Verifier-Prompt (Red-Team Ledger↔Diff). **Laden in Phase 1.5 bei Agenten-Fan-out und Phase 5.0 bei NO-FAIL.**
+- **`references/staged-review.md`** — Zwei-Stufen-Implementierungs-Review durch frische Agenten: Spec-Compliance (under/over-built · misinterpret · unsourced) ZUERST, dann Code-Quality (Duplizierung · Fehlerbehandlung · Idiom-Bruch · toter Pfad · Lesbarkeit), mit Prompt-Vorlagen, Risiko-Gate und Fix-Re-Check-Schleife. Eigene Linse **neben** dem Ledger↔Diff-Kreuzaudit (Coverage). Inkl. Severity-Kalibrierung (Critical/Important/Minor) + SHA-Anker (`BASE_SHA..HEAD_SHA`) für reproduzierbare Reviews. **Laden in Phase 5.0b ab Risiko-Signal, Pflicht bei NO-FAIL.**
 - **`references/systematic-debugging.md`** — Root-Cause-First-Debug-Protokoll (4 Phasen: Investigation → Pattern-Analyse → Hypothese/Test → Fix), Red-Flag-Liste, „nach 3 Fehlversuchen Architektur hinterfragen" + konkrete Taktiken (Condition-based Waiting, Test-Env-Guard für destruktive Ops, Defense-in-Depth-Schichten, Test-Pollution-Bisection, Architektur-Erkennungsmuster). Greift wann immer etwas **bricht statt fehlt** (Test rot · `/verify` falsch · Invarianten-Verletzung · Auto-Fix-Thrashing). **Laden in Phase 4/5 ab dem ersten erfolglosen Fix.**
 - **`references/receiving-review.md`** — Externes Review **empfangen** (Gegenstück zu staged-review, das Review *gibt*): Feedback von Mensch/Tool/Auditor klassifizieren (Real/kontext-blind/halluziniert/unklar), am Source validieren, begründeter Pushback mit Code-/Test-Beleg, Eskalation bei Konflikt mit Vorentscheidung, echte Bugs ins E-Ledger. **Laden in Phase 5, wenn externes Feedback ankommt.**
 - **`references/modeling.md`** — State-Table-Templates, Invarianten-Katalog, Falsy-Entscheidungsmatrix, Contract-/Idempotenz-/Nebenläufigkeits-Checklisten. **Laden in Phase 2 bei State-/Async-/Daten-Änderungen.**

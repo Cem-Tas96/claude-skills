@@ -34,6 +34,24 @@ Nicht „immer maximal". Kopfzahl skaliert mit Risiko-Tier (SKILL.md §3.1) und 
 
 ---
 
+## 1.6 Modell-Tier pro Agent (zweiter Hebel neben der Kopfzahl)
+
+Nicht jeder Agent braucht das stärkste Modell. Die Wahl ist **mechanisch an Task-Klasse + Risiko-Tier gebunden**, kein Ermessen:
+
+| Task-Klasse | Modell-Tier | Warum |
+|---|---|---|
+| Breiten-Recon (Streams A–G) · Symbol-Suche · mechanische Scans (WIP/Brand-Grep) | **günstig/schnell** (z.B. Haiku) | Recall zählt, nicht Präzision — jede gemeldete Stelle wird ohnehin im Source-Abgleich (§3 Gate 2) gegengelesen; Halluzinationen fallen dort raus. Die Gate-Kosten sind fix, unabhängig vom Recon-Modell. |
+| Independent-Verifier (§4) · kalte Zweit-Ableitung (Konsens) · Spec-Compliance bei NO-FAIL | **stärkstes** (z.B. Opus) | Bewertung *unter Unsicherheit* — Lücken *zwischen* Ledger-Zeilen erkennen, Asymmetrie beurteilen, fremde Funde ohne deren Sicht prüfen. Ein Verifier-Fehler sperrt den Liefer-Kurs (offener Kreuzaudit-Befund = BLOCKIERT). |
+| Code-Quality-Review (Idiomatik, lokal) | **mittel** reicht | Idiom ist lokal am Umfeld prüfbar; Source-Abgleich fängt Fehlurteile. |
+
+**Warum nicht das stärkste Modell für alles?** Token-Waste: günstiges Modell + fixes Source-Gate liefert dasselbe Recon-Ergebnis (jede Stelle wird gelesen), nur billiger. Das starke Modell erspart **nicht** die Gate-2-Arbeit, es verdoppelt nur die Recon-Kosten.
+
+**Anti-Feature-Creep:** Die Loop-Disziplin (3 Iterationen ohne neue Ledger-Zeile → STOPP) triggert **kein** Modell-Upgrade. „Nimm jetzt das stärkere Modell" ist kein neuer Erkenntnis-Hebel, sondern dieselbe erschöpfte Suche teurer.
+
+> Read-only bleibt read-only — die Modellwahl ändert nichts daran, dass Agenten nur suchen/prüfen und der Orchestrator mutiert. (Modell-Namen sind Beispiele der Claude-Familie; im Kern zählt das **Tier**, nicht der konkrete Name.)
+
+---
+
 ## 2. Schnitt der Suchaufträge (Streams dürfen sich NICHT überlappen)
 
 Überlappende Aufträge erzeugen Doppel-Findings, die sich scheinbar „bestätigen" — ein Konsens-Artefakt, keine echte Bestätigung. Jeder Stream bekommt eine **disjunkte** Kategorie:
@@ -59,6 +77,22 @@ HARTE REGELN:
 ```
 
 Der Zwang „**wörtlich zitierte Zeile**" ist absichtlich: ein halluzinierter Pfad hat keine echte Zeile zum Zitieren, und das Zitat macht den Source-Abgleich in §3 zu einem Sekunden-Diff statt einer Neu-Suche.
+
+---
+
+## 2b. Subagent-Rekursions-Guard (nur der Top-Level-Orchestrator fährt die Phasen)
+
+Jeder gefächerte Agent (Streams A–G, Independent-Verifier, kalte Zweit-Ableitung) bekommt explizit die Anweisung, `/feature-delivery` **nicht** selbst zu laden/aufzurufen. Sonst startet der Sub-Agent eine zweite Phasen-Maschinerie und kartiert ein paralleles Schatten-Ledger, das der äußere Lauf nie sieht → blinde Doppelarbeit + Konsistenz-Lücke. Die Single-Orchestrator-Mutation verlangt: Agenten liefern **Fundstellen**, der Orchestrator macht daraus Entscheidungen und Schritte.
+
+Zusatz-Zeile für **jede** Fan-out-Prompt-Vorlage (§2):
+
+```
+Du bist ein read-only Recon-/Verifikations-Agent in einem feature-delivery-Lauf.
+Rufe /feature-delivery NICHT auf und starte KEINE Phasen — liefere nur Fundstellen
+(file:line + wörtliches Zitat). Der Orchestrator entscheidet und mutiert.
+```
+
+> Findet der Orchestrator im Report eines Agenten dennoch einen `/feature-delivery`-Aufruf: Output **nicht** als Phasen-State übernehmen, nur die reinen Fundstellen behalten (durch §3-Gate).
 
 ---
 
