@@ -72,3 +72,28 @@ W3  | landing/src/components/Pricing.tsx:88 | N/A    | Lorem-ipsum nur in Storyb
 ```
 
 `WIP-REPLACE offen` ist Ship-Blocker wie jede andere Ledger-Zeile.
+
+## §6 Iron Law — keine test-only-Methoden in Produktionsklassen
+
+> **Regel:** Eine Methode, die **ausschließlich von Tests** aufgerufen wird, gehört in eine Test-Utility, **nicht** in eine Produktionsklasse. Der WIP-Scan oben fängt Platzhalter-*Strings*; diese Klasse ist subtiler — legitim benannte Methoden (`reset`, `destroy`, `seed`, `clear`, `__resetForTest`), die nur existieren, weil ein Test sie braucht.
+
+**Warum es ein Bug ist:** vergrößert die Produktions-API ohne Produktions-Nutzung · verletzt die Invariante „alles in Produktion wird ausgeführt" · erzeugt tot wirkende, aber öffentliche Code-Pfade.
+
+**Erkennung (sprach-agnostisch — Symbol-Referenz-Analyse, nicht String-Grep):**
+```
+Kandidaten-Namen in PRODUKTIONS-Quellen suchen (typisch):
+  reset|destroy|teardown|seed|wipe|clear|__test|_forTest|resetState
+Pro Treffer:
+  └─ Wird das Symbol von PRODUKTIONS-Code referenziert (außerhalb Test-Pfaden)?
+      ├─ ja  → ✓ legitim (keine test-only-Methode)
+      └─ nein → wird es von TEST-Code referenziert?
+                 ├─ ja  → Bug: test-only-Methode in Produktion → HYGIENE-IRON ins Ledger
+                 └─ nein → toter Code → entfernen oder begründen
+```
+*Beispiel-Werkzeug je Stack: `grep`/ripgrep, IDE-„Find usages", oder ein AST-Tool (ts-morph, Python `ast`, go/analysis). Pfad-Heuristik für Test-Code stack-abhängig: `*.test.*`/`*.spec.*`/`tests/`/`__tests__/` (JS), `test_*.py`/`*_test.py` (Python), `*_test.go` (Go).*
+
+**Ersetzung:** Methode in eine Test-Utility/Factory verschieben (z.B. ein Test-Helper-Modul); braucht der Test einen anderen internen Zustand, via Dependency-Injection statt Extra-Methode lösen.
+
+**Output:** `IRON1 | src/services/User.ts:42 | HYGIENE-IRON | reset() nur in Tests genutzt → Test-Utility | offen`. `HYGIENE-IRON offen` ist Ship-Blocker wie jede Ledger-Zeile.
+
+> **Projekt-agnostisch:** Die Regel ist sprachunabhängig; nur die Such-Werkzeuge und Test-Pfad-Muster sind stack-spezifisch (siehe Beispiele).

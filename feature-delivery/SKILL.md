@@ -80,6 +80,7 @@ Dieser Skill ist der **äußere Loop** (vollständig & korrekt bauen). `/feature
    /feature-delivery — der äußere Loop:
 
    PRE-FLIGHT  Threat-Intel-Refresh (1×/Tag: neueste CVEs/Angriffe → Exposure-Check)
+               + Branch-Safety-Gate (Arbeits-Branch oder dokumentierter Consent)
                + WIP-Scan (Dummy/Placeholder/Mock/TODO im berührten Code)
         ↓
    P0  Auftrags-Contract
@@ -87,6 +88,7 @@ Dieser Skill ist der **äußere Loop** (vollständig & korrekt bauen). `/feature
        (Agenten-Fächer nach Tier · Anti-Halluzinations-Gate · NO-FAIL: kalte Zweit-Ableitung)
        P1.7  Cross-Repo Journey-Map (wenn mehrere Repos die Kette teilen)
        P1.8  Spec-Source-of-Truth (jede UI-Behauptung muss eine benannte Quelle haben)
+       P1.95 Design-Optionen-Gate (nur bei architektonischem Blast-Radius: 2–3 Ansätze, begründet wählen)
         ↓
    P2  Modellierung
        P2.1–2.4  State-Table · Invarianten · Falsy · Contracts
@@ -149,6 +151,19 @@ Wenn `/feature-testing` im Projekt nicht verfügbar ist: Phase 5 trotzdem durchf
    - `exposed` auf NO-FAIL-Pfad → sofort BLOCKER ins Coverage-Ledger (P1).
 
 > Läuft IMMER zuerst, auch bei winzigen Changes. Schon heute geprüft → nicht nochmal online, einfach weiter. Das ist die *frische* Hälfte der Security; die *statische* Hälfte (komplette Angriffs-Taxonomie + Paywall-Härtung) ist `references/security-hardening.md`.
+
+### Pre-Flight Teil 1b — BRANCH-SAFETY-GATE (vor Phase 0, Pflicht)
+
+> **Zweck:** Der Default-Branch ist das Bild der Wahrheit für produktive Systeme. Direkt dort mutieren — ohne umkehrbaren Kontext — ist ein Reversibilitäts-Verstoß gegen den Kern-Geist dieses Skills. Ein Arbeits-Branch ist die billigste Absicherung überhaupt und kostet Sekunden.
+
+1. **Branch erkennen** — nur wenn das Projekt ein Git-Repo ist (sonst `N/A — kein Git` und weiter): aktuellen Branch lesen und gegen den **erkannten Default** prüfen (`git symbolic-ref refs/remotes/origin/HEAD` → Default-Name; Fallback `main`/`master`).
+2. **Ist der aktuelle Branch der Default → Gate greift.** Auflösung in dieser Reihenfolge:
+   - **(a) Automatisch branchen** — knapper Name aus dem Contract (`feature/…` / `fix/…`); alle weiteren Commits gehen dorthin.
+   - **(b) Mehrere legitime Namen / unklarer Scope** → die EINE gebündelte Rückfrage mit konkretem Vorschlag (Ein-Prompt-Autonomie), nicht eine Frage-Kaskade.
+   - **(c) Expliziter Consent** des Bosses („direkt auf den Default") → als `CONSENT: direct-on-default` im Delivery-Report dokumentieren (selten, braucht bewusste Freigabe).
+3. **Nie still auf dem Default editieren.** Das Ergebnis (`Branch: feature/…` oder Consent) gehört ins Feld `Branch:` des Delivery-Reports (P6.2).
+
+> **Projekt-agnostisch:** gilt für jeden Forge/Stack (GitHub/GitLab/Bitbucket/lokal). Kein Git-Repo → das Gate entfällt **dokumentiert** (`N/A — kein Git`), der Lauf geht weiter.
 
 ### Pre-Flight Teil 2 — WIP-SCAN (in jedem Lauf, billig, deterministisch)
 
@@ -327,6 +342,33 @@ C5  | role.guard.spec.ts                 | Test           | neue Transition abde
 - **Status** ∈ {offen, ✓, N/A (+Grund)}.
 - **Kein SHIP solange eine Zeile `offen` ist.**
 - **Jede während Phase 4 NEU entdeckte Stelle wird als Ledger-Zeile ergänzt** — niemals "fällt mir später ein" und niemals stillschweigend ausgelassen.
+
+---
+
+## PHASE 1.95 — DESIGN-OPTIONEN-GATE (nur bei architektonischem / mehrdeutigem Blast-Radius)
+
+> **Zweck:** Wenn Phase 1 mehrere technisch zulässige Wege mit unterschiedlichen Konsequenzen offenlegt, vor der Modellierung **2–3 Ansätze skizzieren, begründet einen wählen, die Verworfenen notieren** — damit man sich nicht stillschweigend an eine schlechte Architektur bindet. Das ist der einzige Fehler, den keine noch so gute Coverage repariert. Bewusst **kein** Dialog mit dem Boss (das bräche die Ein-Prompt-Autonomie); die Entscheidung ist autonom und wird im Report belegt.
+
+**Trigger (einer reicht):**
+- Mehrere legitime Implementierungs-Pfade (z.B. additives Feld mit Default vs. separate Migration; Rolle in bestehender Tabelle vs. neue Junction-Tabelle; Feature-Flag vs. direkt).
+- Ein Cross-Layer-Entscheidungspunkt (Config-Duplikat konsolidieren vs. bewusst parallel lassen).
+- Unterbestimmte State-Shape (Cancel = Status-Feld vs. Soft-Delete vs. `activeUntil`-Timestamp — verschiedene Folgen für Archiv/Query/Rollback).
+- Ein Symmetrie-Paar mit mehreren Lösungstechniken (grant via direkter Rolle vs. via Entitlement-Tabelle).
+
+**Nicht triggern:** triviale Änderung · genau **ein** technischer Weg · Entscheidung bereits dokumentiert oder vom Boss vorgegeben (`CLAUDE.md`/Spec). Dann: `P1.95 N/A`.
+
+**Prozess (< 5 Min, intern — kein Boss-Dialog):**
+1. **Mehrdeutigkeit benennen** (1 Satz).
+2. **2–3 Skizzen** (je 3–5 Zeilen: Technik · Hauptvorteil · Hauptnachteil).
+3. **Bewerten** gegen: **Ledger-Größe** (welcher Weg trifft weniger Stellen?) · **Symmetrie/Konsistenz** mit bestehenden Patterns · **Rollback-Sicherheit** (reversibel vs. neue Migration) · **Datenmodell-Kosten**.
+4. **Wählen + Verworfene mit Grund notieren** → zurück zu P2 (keine Rückfrage; die Mehrdeutigkeit ist aufgelöst).
+
+**Selbstaudit (schnell, vor P2):**
+- [ ] Liegt überhaupt eine Mehrdeutigkeit vor (nicht bei jedem Change)?
+- [ ] 2–3 Skizzen ausgearbeitet (keine Einzeiler, kein 30-Seiten-Design)?
+- [ ] Eine begründet gewählt, Verworfene mit Grund notiert (nicht stumm verschwunden)?
+
+> Die Entscheidung gehört in den `DESIGN-ENTSCHEIDUNG`-Block des Delivery-Reports (P6.2) — damit bei Rollback-Diskussionen klar ist, warum dieser Weg und nicht der andere. Projekt-agnostisch: rein methodisch, keine Stack-Annahme.
 
 ---
 
@@ -622,13 +664,16 @@ Aus der Journey-Tabelle ableiten:
 
 ### 6.1 DoD-Checkliste (jede Box muss ✔ sein)
 - [ ] **Coverage-Ledger vollständig** — jede Zeile ✓ oder `N/A (+Grund)`, keine `offen`
+- [ ] **Branch-Safety-Gate (Pre-flight)** — nicht auf dem Default-Branch mutiert: Arbeits-Branch angelegt (`Branch:` im Report) **oder** dokumentierter `CONSENT: direct-on-default` **oder** `N/A — kein Git`
 - [ ] **WIP-Scan abgehandelt** — jeder Pre-flight-Treffer (`TODO|DUMMY|HARDCODED|…`) ist `✓ (ersetzt)` oder `N/A (+Datei-Pfad als Test/Doc-Beleg)`
+- [ ] **Produktions-Hygiene** — kein test-only-Code in Produktionsklassen (Iron-Law, `wip-scanner.md` §6); keine reinen Mock-Assertions ohne Verhaltens-Beweis (`/feature-testing` Gate 7)
 - [ ] **Reverse-Pfade** im selben Change angefasst (oder `N/A` begründet) — inkl. **Mail-Symmetrien** aus P2.6
 - [ ] **State-Table** vollständig, alle Invarianten in allen Zellen erfüllt
 - [ ] **Falsy-Enumeration** für jede neue Validierung durchgegangen
 - [ ] **Cross-Layer-Kopplung** (Config-Duplikate / Shared-Lib-Consumer / `CLAUDE.md`-Behaviors) abgedeckt
 - [ ] **Cross-Repo Journey-Map (P1.7)** — bei Multi-Repo-Features: jede Übergangs-Zeile in P5.8 mit ✓ belegt (Screenshot/Log je Übergang)
 - [ ] **Spec-Source-of-Truth (P1.8)** — jeder user-sichtbare Marketing/Preis/Limit-Text hat eine benannte Quelle; UI-Code-Wert == Quell-Wert (Zeichen-für-Zeichen)
+- [ ] **Design-Optionen (P1.95)** — bei architektonischer Mehrdeutigkeit: 2–3 Ansätze gegeneinander skizziert, einer begründet gewählt, Verworfene notiert (oder `N/A — trivial / 1 Weg / dokumentiert`)
 - [ ] **Mail-Pflicht-Matrix (P2.6)** — pro Trigger im Diff ist Vorwärts- + Counter-Mail im Code belegt + in P5.7 visuell verifiziert
 - [ ] **Brand/White-Label-Sweep (P2.7)** — keine Original-Brand-Reste; CLAUDE.md-Brand-Regeln eingehalten; Mail-Templates auf Brand geprüft
 - [ ] **Agenten-Befunde verifiziert** — jede vom Sub-Agenten gemeldete Stelle am Source gegengelesen (kein blind übernommener Pfad)
@@ -659,6 +704,7 @@ Aus der Journey-Tabelle ableiten:
 FEATURE DELIVERY REPORT
 ═══════════════════════════════════════════════════════
 Feature:        [Name]            Projekt: [Repo]
+Branch:         [feature/… angelegt | Default + CONSENT: direct-on-default | N/A — kein Git]
 Risiko-Tier:    NO-FAIL / LOW-FAIL / BEST-EFFORT
 Test-Tier:      Unit / Integration / Real-Browser / Real-Stack-Smoke  (Begründung)
 
@@ -676,6 +722,11 @@ BLAST-RADIUS-NACHWEIS
   Shared-Lib-Consumer:    [Liste / keine]
   Generierte Artefakte:   [neu generiert / N/A]
   Symmetrie-Paare:        [grant↔revoke etc. — alle gepaart / N/A-Begründung]
+
+DESIGN-ENTSCHEIDUNG (P1.95 — bei architektonischer Mehrdeutigkeit)
+  Mehrdeutigkeit:   [was war unterbestimmt / N/A — trivial/1 Weg/dokumentiert]
+  Gewählt:          [Ansatz + Grund in 1 Satz]
+  Verworfen:        [Ansatz X: Grund · Ansatz Y: Grund]
 
 MODELL
   State-Table:    [vollständig / N/A]  Invarianten geprüft: [Liste]
@@ -789,7 +840,7 @@ Damit Disziplin nicht zur ungemessenen Ceremony wird: bei jedem Lauf im Delivery
 - **`references/blast-radius.md`** — Konkrete Recon-Rezepte: Symbol-Suche, Sub-Agent-Fan-out-Templates, der vollständige Cross-Layer-Kopplungs-Katalog, das Symmetrie-Paar-Katalog, die Coverage-Ledger-Vorlage. **Laden in Phase 1, immer bei nicht-trivialem Blast-Radius.**
 - **`references/multi-agent.md`** — Multi-Agent-Orchestrierung & Anti-Halluzination: Agenten-Budget nach Risiko-Tier (wie viele wann), disjunkte Stream-Schnitte, Citation-or-void + Source-Abgleich + Konsens-Gate, kalte Zweit-Ableitung, Independent-Verifier-Prompt (Red-Team Ledger↔Diff). **Laden in Phase 1.5 bei Agenten-Fan-out und Phase 5.0 bei NO-FAIL.**
 - **`references/staged-review.md`** — Zwei-Stufen-Implementierungs-Review durch frische Agenten: Spec-Compliance (under/over-built · misinterpret · unsourced) ZUERST, dann Code-Quality (Duplizierung · Fehlerbehandlung · Idiom-Bruch · toter Pfad · Lesbarkeit), mit Prompt-Vorlagen, Risiko-Gate und Fix-Re-Check-Schleife. Eigene Linse **neben** dem Ledger↔Diff-Kreuzaudit (Coverage). **Laden in Phase 5.0b ab Risiko-Signal, Pflicht bei NO-FAIL.**
-- **`references/systematic-debugging.md`** — Root-Cause-First-Debug-Protokoll (4 Phasen: Investigation → Pattern-Analyse → Hypothese/Test → Fix), Red-Flag-Liste, „nach 3 Fehlversuchen Architektur hinterfragen". Greift wann immer etwas **bricht statt fehlt** (Test rot · `/verify` falsch · Invarianten-Verletzung · Auto-Fix-Thrashing). **Laden in Phase 4/5 ab dem ersten erfolglosen Fix.**
+- **`references/systematic-debugging.md`** — Root-Cause-First-Debug-Protokoll (4 Phasen: Investigation → Pattern-Analyse → Hypothese/Test → Fix), Red-Flag-Liste, „nach 3 Fehlversuchen Architektur hinterfragen" + konkrete Taktiken (Condition-based Waiting, Test-Env-Guard für destruktive Ops, Defense-in-Depth-Schichten, Test-Pollution-Bisection, Architektur-Erkennungsmuster). Greift wann immer etwas **bricht statt fehlt** (Test rot · `/verify` falsch · Invarianten-Verletzung · Auto-Fix-Thrashing). **Laden in Phase 4/5 ab dem ersten erfolglosen Fix.**
 - **`references/modeling.md`** — State-Table-Templates, Invarianten-Katalog, Falsy-Entscheidungsmatrix, Contract-/Idempotenz-/Nebenläufigkeits-Checklisten. **Laden in Phase 2 bei State-/Async-/Daten-Änderungen.**
 - **`references/security-pass.md`** — Der Security-Engineer-Schnelldurchgang (Authz/IDOR, Injection-Klassen, Secrets, Open-Redirect/SSRF, Falsy-as-Bypass) + Eskalations-Regel wann die NO-FAIL-`zero-fail-zones.md` zu ziehen ist. **Laden in Phase 2.5, Pflicht bei NO-FAIL.**
 - **`references/verification.md`** — Test-Tier-Entscheidungsbaum, jsdom-Fallen-Katalog, Orchestrierung von `/feature-testing` + `/verify` (inkl. `AN /verify`-Handoff), Real-Stack-Smoke-Rezept (Clean-Bring-up), manueller Fallback. **Laden in Phase 3 & 5.**

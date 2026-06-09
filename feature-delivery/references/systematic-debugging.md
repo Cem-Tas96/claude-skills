@@ -58,6 +58,55 @@ Bei einem trivialen, offensichtlichen Tippfehler mit eindeutiger Stack-Trace-Zei
 
 ---
 
+## Konkrete Taktiken — Phase 1–4 vertieft
+
+Die folgenden sechs Taktiken docken an die vier Phasen oben an. Jede ist als **Prinzip** formuliert; konkrete Befehle sind als Stack-Beispiel markiert — im jeweiligen Stack das Äquivalent nehmen (projekt-agnostisch).
+
+### T1 — Condition-based Waiting statt fixer Wartezeit  *(Phase 1 + Test-Setup)*
+Ein fester `sleep`/`setTimeout` maskiert Races und macht Tests langsam + flaky. Konstruktiv wartet man auf die **Bedingung**, nicht die Zeit: auf ein reales Prädikat pollen (Event eingetreten · State erreicht · Count == n · Datei existiert), mit **Pflicht-Timeout und beschreibender Fehlermeldung** — nie unbegrenzt, nie nur „timeout".
+- **Regel:** jede Warte-Konstruktion hat (1) ein reales Prädikat, (2) ein gebundenes Timeout, (3) eine Fehlermeldung die erwarteten vs. letzten Zustand nennt.
+- *Beispiel: `waitFor(pred, timeoutMs, ~10ms-Poll)` in JS; `Eventually(...)` (Gomega) in Go; `wait_for`/Polling in Python; `Awaitility` in Java.*
+
+### T2 — Destruktive Operationen hinter Test-Environment-Flag + isolierter Temp-Pfad  *(Phase 4)*
+Destruktive Ops (Verzeichnis löschen, DB droppen, Cleanup) dürfen NUR im Test-Kontext laufen, sonst sauber abbrechen. Temp-Pfade müssen **projekt-relativ und pro Lauf eindeutig** sein, nicht der OS-Tmp-Root (sonst keine Isolation zwischen Läufen).
+- **Regel:** `wenn nicht Test-Env → mit Fehler abbrechen`; Temp-Pfad relativ zum Projekt-Root + pro Lauf eindeutig; im Teardown gezielt aufräumen.
+- *Beispiel-Flag: `NODE_ENV==='test'` (JS), `PYTEST_CURRENT_TEST`/`pytest`-Marker (Python), `RAILS_ENV=test`, Build-Tag/`testing.Testing()` (Go).*
+
+### T3 — Defense-in-Depth: validiere in mehreren Schichten, jede fängt eine andere Bug-Klasse  *(Phase 2 + 3)*
+Multi-Punkt-Validierung ist nicht Redundanz — jede Schicht fängt einen anderen Fehler-Typ. Vier benannte Schichten, jede separat getestet:
+
+| Schicht | Bug-Klasse | Test-Frage |
+|---|---|---|
+| **Entry-Validation** | ungültige Eingabe, Format, Null/leer | wird ungültiger Input am Eingang abgewiesen? |
+| **Business-Logic** | falsche Berechnung/Transition/Prädikat | liefert gültiger Input das korrekte Ergebnis? |
+| **Environment-Guard** | Config fehlt, Service down, Permission | bricht der Pfad bei fehlender Abhängigkeit sauber ab? |
+| **Instrumentation** | falsches/fehlendes Log/Metrik/Auditlog | wird der erwartete Effekt beobachtbar? |
+
+- **Regel:** für jeden kritischen Wert prüfen, ob er an *mehr als einer* Schicht abgesichert ist; und testen, dass eine untere Schicht greift, wenn man eine obere umgeht. Fällt eine Schicht, die anderen grün → Bug ist auf diese Schicht lokalisiert.
+
+### T4 — Test-Pollution-Bisection  *(Phase 1 — „zuverlässig reproduzieren")*
+Ein Test rot nur **in Kombination** mit einem anderen = Isolations-Bruch, nicht Flakiness. Finde den Verschmutzer per Halbierung, nicht per Raten:
+1. verdächtigen Test **isoliert** laufen → grün?
+2. mit Vorgängern kombiniert → rot? → die Test-Menge halbieren, bis der **direkte** Verschmutzer isoliert ist; dann dessen Teardown / globalen State prüfen.
+- *Ergänzt die Order-Randomisierung (`jest --randomize`, `pytest-randomly`, `go test -shuffle`): das Randomisieren **findet** die Order-Abhängigkeit, die Bisection **isoliert** die Ursache.*
+
+### T5 — Instrumentieren VOR der Operation, auf einen erfassten Stream  *(Phase 1, Schritt 4 vertieft)*
+Diagnose-Logging gehört **vor** die verdächtige Operation (um den Zustand zu sehen, der hineinführt), nicht nach dem Fehler. Im Test auf einen Stream loggen, den der Test wirklich **erfasst** — nicht auf einen evtl. stummgeschalteten Logger.
+- *Beispiel: in JS-Tests `console.error` statt evtl. unterdrücktem Logger; im jeweiligen Stack das Äquivalent.* Reichen Kontext mitloggen (Eingabe, Zwischenwerte), nicht nur „hier".
+
+### T6 — Architektur-Problem-Erkennungsmuster (bevor die 3-Fehlversuch-Grenze erreicht ist)  *(Phase 4)*
+Diese Muster signalisieren: das Problem ist nicht *eine Zeile*, sondern Architektur / falsche Annahme — Architektur hinterfragen, ohne erst 3 Fehlversuche zu sammeln:
+
+| Muster | Symptom | Wahrer Grund / Antwort |
+|---|---|---|
+| Jeder Fix legt neue Kopplung frei | Fix in X bricht Y, Fix in Y bricht Z | gemeinsamer impliziter State / Init-Reihenfolge → Abhängigkeitsgraph entkoppeln |
+| Erfordert Massiv-Refactor | jeder Patch nur temporär, der nächste Fall bricht neu | Feature passt nicht ins Modell → Design-Annahme hinterfragen, nicht weiterpatchen |
+| Erzeugt neues Symptom | Fix behebt A, erzeugt B woanders | mehrere Pfade mit gemeinsamer Root-Cause → alle Pfade gleichzeitig instrumentieren |
+| Nur bei Parallelität rot | lokal grün, parallel/CI rot | Race / geteilter Cache → Environment-Guard-Schicht (T3) prüfen |
+| Nur beim 2. Lauf rot | erster Lauf grün, zweiter rot | Cleanup- / State-Remanenz → Test-Env-Guard + isolierter Temp-Pfad (T2) |
+
+---
+
 ## Red Flags — sofort Protokoll von vorn
 
 - Du schlägst eine Lösung vor, **bevor** du den Datenfluss verfolgt hast.
@@ -84,3 +133,7 @@ Systematisches Debuggen ist **schneller** als Guess-and-Check-Thrashing — nich
 - [ ] **Nur eine** Ursache gefixt, nicht „zur Sicherheit" mehrere Stellen?
 - [ ] Regressions-Sweep (P5.4) grün — kein vorher-grüner Test jetzt rot?
 - [ ] Bei ≥3 Fehlversuchen: gestoppt und Architektur/Annahme hinterfragt statt weiter geraten?
+- [ ] Async-Wartezeiten als **Bedingung** (T1) statt fixem sleep — mit Timeout + klarer Fehlermeldung?
+- [ ] Destruktive Test-Ops hinter Test-Env-Flag + isoliertem, projekt-relativem Temp-Pfad (T2)?
+- [ ] Bei „nur in Kombination rot": Test-Pollution-Bisection (T4) gefahren, Verschmutzer isoliert?
+- [ ] Architektur-Erkennungsmuster (T6) geprüft, bevor blind weiter gepatcht wurde?
