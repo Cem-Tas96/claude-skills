@@ -101,6 +101,7 @@ Dieser Skill ist der **äußere Loop** (vollständig & korrekt bauen). `/feature
         ↓
    P5  Verifikation:
          • Independent-Verifier   (NO-FAIL: Red-Team-Agent Ledger↔Diff — fehlt/erfunden?)
+         • Staged-Review          (ab Risiko-Signal: Spec-Compliance → dann Code-Quality, je frischer Agent)
          • invoke /feature-testing   (Test-Beweis: Mocks/jsdom)
          • invoke /verify            (Real-Runtime: echte App)
          P5.5  END-TO-END USER-KLICK-THROUGH (echte Karte/Mailbox/Browser-Session)
@@ -502,6 +503,14 @@ Gesucht wird gezielt (Prompt-Vorlage: `references/multi-agent.md` §4):
 
 > Output durchläuft **dasselbe** Anti-Halluzinations-Gate (§1.5) — auch ein Verifier-Agent halluziniert. Jeder bestätigte Befund wird vor SHIP aufgelöst: (a) wirklich abarbeiten, (b) neue Ledger-Zeile + Recon nachschärfen, (c) Zeile streichen, (d) Reverse-Pfad bauen oder `N/A (+Grund)`. **Offener Kreuzaudit-Befund = BLOCKIERT, wann immer der Audit lief.**
 
+### 5.0b Staged-Review — Spec-Compliance, dann Code-Quality (eigene Linse neben dem Kreuzaudit)
+Der Kreuzaudit (5.0) prüft **Coverage** („fehlt/erfunden?"). Er beantwortet **nicht** „ist das *Richtige* gebaut?" und nicht „ist es *gut* gebaut?". Diese zwei Linsen laufen jetzt — **getrennt, in dieser Reihenfolge, mit frischen Augen** (Voll-Protokoll + Prompt-Vorlagen: `references/staged-review.md`):
+- **Stufe 1 — Spec-Compliance** (gegen P0-Contract + Spec-Quelle P1.8, **nicht** gegen das eigene Ledger): fängt **under-built** (Akzeptanz-Kriterium nicht erfüllt), **over-built** (ungefragter Scope-Creep), **misinterpret** (richtige Anforderung, falsches Verhalten/Default), **unsourced** (halluzinierter UI-Text/Preis). **Muss grün sein, bevor Stufe 2 startet** — Quality-Review von weg-zu-werfendem Code ist doppelt verschwendet.
+- **Stufe 2 — Code-Quality** (Diff + Umfeld): Duplizierung existierender Utils, unbehandelter Fehler-/Falsy-Pfad, Idiom-/Naming-Bruch gegen das Umfeld, toter Pfad, Lesbarkeit. Nach dem letzten Fix **einmal re-checken**.
+
+**Wer prüft, skaliert mit der Blast-Radius-Form** (wie 5.0): **Self-Review** beim schmalen LOW-FAIL, **frischer `Explore`-Agent je Stufe** ab Risiko-Signal (>8 Ledger-Zeilen · Symmetrie-Paar · Cross-Layer-Kopplung · Sub-Agenten gefächert) und immer bei NO-FAIL.
+> Reviewer-Output durchläuft **dasselbe** Anti-Halluzinations-Gate (§1.5) wie jeder Agent. Offener Spec-Compliance-Befund (under/over/misinterpret/unsourced) = **BLOCKIERT**. Quality-Befunde der Klassen Duplizierung/Fehlerbehandlung sind grenzwertig zu Korrektheit → blockieren bei NO-FAIL.
+
 ### 5.1 Test-Beweis: `/feature-testing` aufrufen
 Jetzt — Implementierung vollständig — `/feature-testing` invoken. Dieser Skill besitzt Test-Strategie, Test-Quality-Gates (Gate 1–8), Auto-Fix-Loop und das NO-FAIL-Test-Regime. **Nicht hier duplizieren.** Das gewählte Test-Tier (§3.2) und die Invarianten (§2.2) als Input übergeben.
 (Nicht verfügbar? → Test-Disziplin inline aus `references/verification.md`.)
@@ -527,6 +536,7 @@ Auf den Diff der laufenden Änderung `/security-review` invoken — fängt die k
 
 ### 5.4 Regressions-Sweep
 Volle bestehende Test-Suite laufen lassen (nicht nur die neuen). Lint + Typecheck + Build grün. Keine vorher-grünen Tests jetzt rot.
+> **Bricht hier (oder in 5.1/5.2) etwas — Test rot, `/verify` falsches Verhalten, Invarianten-Verletzung —: NICHT raten.** Ab dem ersten erfolglosen Fix das Root-Cause-First-Protokoll fahren (`references/systematic-debugging.md`): Ursache benennen (`file:line` + Warum) → failing Test (RED→GREEN) → **ein** gezielter Fix → Sweep erneut. **Harte Regel: nach 3 Fehlversuchen STOPP** und Architektur/Annahme hinterfragen — exakt die Coverage-Diminishing-Returns-Disziplin, aufs Debuggen angewandt. Guess-and-Check baut versteckte Regressionen ein und ist langsamer, nicht schneller.
 
 ### 5.5 END-TO-END USER-KLICK-THROUGH (echte Karte · echte Mailbox · echter Browser · Screenshot je Stufe)
 
@@ -623,6 +633,8 @@ Aus der Journey-Tabelle ableiten:
 - [ ] **Brand/White-Label-Sweep (P2.7)** — keine Original-Brand-Reste; CLAUDE.md-Brand-Regeln eingehalten; Mail-Templates auf Brand geprüft
 - [ ] **Agenten-Befunde verifiziert** — jede vom Sub-Agenten gemeldete Stelle am Source gegengelesen (kein blind übernommener Pfad)
 - [ ] **Ledger↔Diff-Kreuzaudit** sauber (immer außer trivial): Selbst-Audit beim schmalen LOW-FAIL, **unabhängiger Verifier** ab Risiko-Signal/NO-FAIL; bei NO-FAIL zusätzlich kalte Zweit-Ableitung (Konsens) — keine offenen (a)/(b)/(c)/(d)-Befunde
+- [ ] **Staged-Review (P5.0b)** — Spec-Compliance (under/over-built · misinterpret · unsourced) grün **vor** Code-Quality (Duplizierung · Fehlerbehandlung · Idiom · toter Pfad); ab Risiko-Signal/NO-FAIL je frischer Agent; keine offenen blockierenden Befunde
+- [ ] **Bei Brüchen Root-Cause-First** (`systematic-debugging.md`) gefahren — Ursache benannt, RED→GREEN-Test, kein Guess-and-Check, nach ≤3 Fehlversuchen Architektur hinterfragt
 - [ ] **Threat-Intel heute aktualisiert** (Pre-flight gelaufen; `exposed`-Funde gemittelt oder geblockt)
 - [ ] **Security-Pass** ohne offene Findings (NO-FAIL: `security-hardening.md`-Taxonomie §1 + zero-fail-zones komplett)
 - [ ] **`/security-review`** auf dem Diff sauber; bei Payment/Zugang: Paywall-/Abuse-Härtung (server-seitiges Entitlement, **kein** IP/Geo-Gate) geprüft
@@ -776,6 +788,8 @@ Damit Disziplin nicht zur ungemessenen Ceremony wird: bei jedem Lauf im Delivery
 
 - **`references/blast-radius.md`** — Konkrete Recon-Rezepte: Symbol-Suche, Sub-Agent-Fan-out-Templates, der vollständige Cross-Layer-Kopplungs-Katalog, das Symmetrie-Paar-Katalog, die Coverage-Ledger-Vorlage. **Laden in Phase 1, immer bei nicht-trivialem Blast-Radius.**
 - **`references/multi-agent.md`** — Multi-Agent-Orchestrierung & Anti-Halluzination: Agenten-Budget nach Risiko-Tier (wie viele wann), disjunkte Stream-Schnitte, Citation-or-void + Source-Abgleich + Konsens-Gate, kalte Zweit-Ableitung, Independent-Verifier-Prompt (Red-Team Ledger↔Diff). **Laden in Phase 1.5 bei Agenten-Fan-out und Phase 5.0 bei NO-FAIL.**
+- **`references/staged-review.md`** — Zwei-Stufen-Implementierungs-Review durch frische Agenten: Spec-Compliance (under/over-built · misinterpret · unsourced) ZUERST, dann Code-Quality (Duplizierung · Fehlerbehandlung · Idiom-Bruch · toter Pfad · Lesbarkeit), mit Prompt-Vorlagen, Risiko-Gate und Fix-Re-Check-Schleife. Eigene Linse **neben** dem Ledger↔Diff-Kreuzaudit (Coverage). **Laden in Phase 5.0b ab Risiko-Signal, Pflicht bei NO-FAIL.**
+- **`references/systematic-debugging.md`** — Root-Cause-First-Debug-Protokoll (4 Phasen: Investigation → Pattern-Analyse → Hypothese/Test → Fix), Red-Flag-Liste, „nach 3 Fehlversuchen Architektur hinterfragen". Greift wann immer etwas **bricht statt fehlt** (Test rot · `/verify` falsch · Invarianten-Verletzung · Auto-Fix-Thrashing). **Laden in Phase 4/5 ab dem ersten erfolglosen Fix.**
 - **`references/modeling.md`** — State-Table-Templates, Invarianten-Katalog, Falsy-Entscheidungsmatrix, Contract-/Idempotenz-/Nebenläufigkeits-Checklisten. **Laden in Phase 2 bei State-/Async-/Daten-Änderungen.**
 - **`references/security-pass.md`** — Der Security-Engineer-Schnelldurchgang (Authz/IDOR, Injection-Klassen, Secrets, Open-Redirect/SSRF, Falsy-as-Bypass) + Eskalations-Regel wann die NO-FAIL-`zero-fail-zones.md` zu ziehen ist. **Laden in Phase 2.5, Pflicht bei NO-FAIL.**
 - **`references/verification.md`** — Test-Tier-Entscheidungsbaum, jsdom-Fallen-Katalog, Orchestrierung von `/feature-testing` + `/verify` (inkl. `AN /verify`-Handoff), Real-Stack-Smoke-Rezept (Clean-Bring-up), manueller Fallback. **Laden in Phase 3 & 5.**
