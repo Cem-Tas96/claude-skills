@@ -552,6 +552,7 @@ Der Kreuzaudit (5.0) prüft **Coverage** („fehlt/erfunden?"). Er beantwortet *
 
 **Wer prüft, skaliert mit der Blast-Radius-Form** (wie 5.0): **Self-Review** beim schmalen LOW-FAIL, **frischer `Explore`-Agent je Stufe** ab Risiko-Signal (>8 Ledger-Zeilen · Symmetrie-Paar · Cross-Layer-Kopplung · Sub-Agenten gefächert) und immer bei NO-FAIL.
 > Reviewer-Output durchläuft **dasselbe** Anti-Halluzinations-Gate (§1.5) wie jeder Agent. Offener Spec-Compliance-Befund (under/over/misinterpret/unsourced) = **BLOCKIERT**. Quality-Befunde der Klassen Duplizierung/Fehlerbehandlung sind grenzwertig zu Korrektheit → blockieren bei NO-FAIL.
+> **Externes Feedback** (Mensch/Tool/Auditor während dieser Phase): nicht annehmen, sondern **verarbeiten** — jedes Finding klassifizieren · am Source validieren · mit Code-/Test-Beleg zurückschieben · Konflikt mit einer Vorentscheidung eskalieren statt auto-anwenden. Protokoll: `references/receiving-review.md`.
 
 ### 5.1 Test-Beweis: `/feature-testing` aufrufen
 Jetzt — Implementierung vollständig — `/feature-testing` invoken. Dieser Skill besitzt Test-Strategie, Test-Quality-Gates (Gate 1–8), Auto-Fix-Loop und das NO-FAIL-Test-Regime. **Nicht hier duplizieren.** Das gewählte Test-Tier (§3.2) und die Invarianten (§2.2) als Input übergeben.
@@ -679,6 +680,7 @@ Aus der Journey-Tabelle ableiten:
 - [ ] **Agenten-Befunde verifiziert** — jede vom Sub-Agenten gemeldete Stelle am Source gegengelesen (kein blind übernommener Pfad)
 - [ ] **Ledger↔Diff-Kreuzaudit** sauber (immer außer trivial): Selbst-Audit beim schmalen LOW-FAIL, **unabhängiger Verifier** ab Risiko-Signal/NO-FAIL; bei NO-FAIL zusätzlich kalte Zweit-Ableitung (Konsens) — keine offenen (a)/(b)/(c)/(d)-Befunde
 - [ ] **Staged-Review (P5.0b)** — Spec-Compliance (under/over-built · misinterpret · unsourced) grün **vor** Code-Quality (Duplizierung · Fehlerbehandlung · Idiom · toter Pfad); ab Risiko-Signal/NO-FAIL je frischer Agent; keine offenen blockierenden Befunde
+- [ ] **Externes Review verarbeitet (falls angekommen)** — jedes Finding klassifiziert (Real/kontext-blind/halluziniert/unklar), am Source validiert (Laufzeit-Test bei Laufzeit-Bug), Pushback mit Beleg statt Diskurs, echte Bugs als E-Ledger-Zeilen (`references/receiving-review.md`)
 - [ ] **Bei Brüchen Root-Cause-First** (`systematic-debugging.md`) gefahren — Ursache benannt, RED→GREEN-Test, kein Guess-and-Check, nach ≤3 Fehlversuchen Architektur hinterfragt
 - [ ] **Threat-Intel heute aktualisiert** (Pre-flight gelaufen; `exposed`-Funde gemittelt oder geblockt)
 - [ ] **Security-Pass** ohne offene Findings (NO-FAIL: `security-hardening.md`-Taxonomie §1 + zero-fail-zones komplett)
@@ -692,7 +694,9 @@ Aus der Journey-Tabelle ableiten:
 - [ ] **Regressions-Sweep** grün (bestehende Tests, Lint, Typecheck, Build)
 - [ ] **Tier-Floor-Gate** angewandt — Auth/Payment/Rollen/PII/Migration berührt → NO-FAIL gesetzt (nicht per Ermessen heruntergestuft)
 - [ ] **Rollout (P7)** für Prod-Changes belegt — rückwärtskompatibel, Kill-Switch (NO-FAIL), Rollback getestet, Observability live (oder `N/A` begründet bei rein lokalem Tooling)
+- [ ] **Branch-Finish (P7.1)** — Disposition gewählt (lokal/PR/Archiv, NO-FAIL→Review), Report als PR-Body/Handoff, Post-Merge-Retest bei NO-FAIL durchgeführt (oder `N/A`)
 - [ ] **Loop-Disziplin** — nicht im Brute-Force-Loop gefahren; keine 3 aufeinanderfolgenden Iterationen ohne neue Ledger-Zeile / neue Coverage
+- [ ] **Graded-Status konsequent (P6.2b)** — SHIP nur bei 0 offen; DONE_WITH_CONCERNS nur mit benannten Concerns + Owner + Deadline; NEEDS_CONTEXT mit der einen Frage; BLOCKIERT mit Root-Cause (file:line/Artefakt)
 - [ ] **Commit-Message** benennt Invariante & Reverse-Pfad (nicht nur das Symptom)
 
 > Ist ein Punkt offen → **melden, nicht "done" sagen.** Vor dem Commit, nicht als Folgekommit.
@@ -768,12 +772,29 @@ WIRKSAMKEITS-SIGNAL
   Ledger-Umfang:            [n Stellen]
 
 ═══════════════════════════════════════════════════════
-URTEIL: SHIP / BLOCKIERT
-Grund (bei BLOCKIERT): [konkret, handlungsrelevant]
+URTEIL: SHIP / DONE_WITH_CONCERNS / NEEDS_CONTEXT / BLOCKIERT
+Grund (bei BLOCKIERT):              [konkret — file:line/Artefakt, nicht "geht nicht"]
+Concerns (bei DONE_WITH_CONCERNS):  [Klasse → Owner → Deadline; je Concern eine Zeile]
+Context needed (bei NEEDS_CONTEXT): [die EINE Frage → an wen]
 ═══════════════════════════════════════════════════════
 ```
 
 > **BLOCKIERT = nichts verlässt den Branch** bis der Grund behoben ist. Ein offenes Coverage-Ledger ist immer BLOCKIERT.
+
+### 6.2b Graded Completion Status (Zwischenstufen statt binär)
+
+Damit „funktional fertig, aber außerhalb dieses Prompts hängend" nicht fälschlich als harter Block oder als sauberes SHIP verbucht wird, hat das Urteil vier Stufen:
+
+| Status | Bedeutung | Auslöser | Folge |
+|---|---|---|---|
+| **SHIP** | live-fähig | alle DoD ✔, 0 offene Ledger-/Verifier-Befunde, verifiziert | deployen (P7) |
+| **DONE_WITH_CONCERNS** | funktional vollständig & verifiziert, aber ≥1 **benannter, dokumentierter Rest** | Concern-Klasse-Treffer + Owner + Deadline festgenagelt | shippen **mit** Concern-Tracking; Rollout ok |
+| **NEEDS_CONTEXT** | hängt an einer **Entscheidung/Information** (kein Code-Bug) | Boss-OK / Spec-Klärung / Zugang fehlt; DoD sonst ✔ | **kein Merge** bis Antwort; die EINE Frage an den Owner |
+| **BLOCKIERT** | offene **Code-/Daten-/Sicherheits-Lücke** | Ledger `offen` · Verifier-Befund · `/verify`-Bruch · Security-Finding | nichts verlässt den Branch; Root-Cause benannt |
+
+**Concern-Katalog** (löst DONE_WITH_CONCERNS aus — funktional korrekt, aber geschäftlich/architektonisch unvollständig): zurückgestellte Härtung · sekundäre UI fehlt · Eventual-Consistency-Lag · Live-Datenmigration ausstehend · externes Setup nötig (Key/Webhook/Plan) · Observability noch nicht konfiguriert · Kundenkommunikation/Changelog offen · Compliance/Legal-Review offen.
+
+> **Faustregel:** Fehlt **„Code schreiben"** → Bug (BLOCKIERT). Fehlt **„jemand sagt ja / externes Setup / Compliance / Migrations-Fenster"** → Concern (DONE_WITH_CONCERNS mit Owner + Deadline) oder NEEDS_CONTEXT, **kein** Block. Rein über die Art des fehlenden Schritts entschieden — projekt-agnostisch.
 
 ---
 
@@ -788,6 +809,15 @@ Die in P3.4 gewählte Strategie jetzt **belegen** (nicht nur geplant):
 - [ ] **Observability live** — Log/Metrik auf Erfolg **und** Fehler des neuen Pfads, Alert auf den relevanten Bruch, neue Exception von Sentry erfasst; bei NO-FAIL die P2.2-Invariante als laufender Monitor (§4).
 
 > Faustregel: Ist die Antwort auf „und wenn das in Prod bricht?" ein neuer Hotfix-Deploy statt ein Schalter — **nicht produktionsreif.**
+
+### 7.1 Branch-Finish & PR-Handoff (Lieferung an Repo/Team)
+
+Nach belegtem Rollout den lokalen Branch abschließen — die Grenze zwischen „fertig" und „lebt auf dem Default-Branch". Voll-Protokoll: `references/branch-finish.md`.
+- **Disposition** wählen (lokal mergen / PR-MR / Archiv) — **NO-FAIL geht in Review**, kein stiller Merge auf den Default.
+- **Delivery-Report = PR-Body** (keine Doppelung); **forge-agnostisch**: `git push` universal, PR-Erstellung je nach Forge (`gh`/`glab`/…), sonst dokumentiertes **manuelles Handoff** (Diff + Report ins Ticket). Kein Git → `N/A`.
+- **Post-Merge-Retest** bei NO-FAIL/Risiko-Signal: auf dem **gemergten** Stand Spot-Check der kritischen Ledger-Stellen + Real-Stack-Smoke + Invarianten (fängt Integrations-only-Bugs). Entfällt nur bei konfliktfreiem Fast-Forward / reinem Read-only-Change.
+
+> Faustregel: Lokales `/verify` auf dem Feature-Branch ist kein Beweis für den gemergten Default — bei NO-FAIL nach dem Merge einmal die kritischen Stufen wiederholen.
 
 ---
 
@@ -832,6 +862,9 @@ Damit Disziplin nicht zur ungemessenen Ceremony wird: bei jedem Lauf im Delivery
 | UI-Limit ohne Server-Enforcement | Free-Tier-Abuse | Adversarial Plan-Limit-Test (P5.6) — `limit+1` |
 | Brand-Reste im White-Label-Fork | „Powered by Activepieces" auf Landing | Brand-Sweep (P2.7) gegen CLAUDE.md-Regeln |
 | Brute-Force-Loop „bis er kein Bock mehr hat" | Token-Waste, kein Coverage-Wachstum | Loop-Diminishing-Returns-Stopp (3 Iter. ohne Neues → andere Methode) |
+| Direkt auf `main`/`master` editiert | irreversibler Live-Edit ohne Draft-Zyklus | Branch-Safety-Gate (Pre-flight) — Arbeits-Branch oder Consent |
+| `BLOCKIERT` mit `DONE_WITH_CONCERNS` verwechselt | Migration/Setup fehlt → Feature fälschlich geblockt (oder still geshippt) | Graded-Status (P6.2b): Code-Bug = BLOCKIERT, Ressourcen-/Entscheidungslücke = Concern/NEEDS_CONTEXT |
+| Externes Review-Finding blind übernommen | Reviewer-Kontextlücke wird zu Folgekommit | Externes Review empfangen (`receiving-review.md`): klassifizieren, am Source validieren, mit Beleg zurückschieben |
 
 ---
 
@@ -841,12 +874,14 @@ Damit Disziplin nicht zur ungemessenen Ceremony wird: bei jedem Lauf im Delivery
 - **`references/multi-agent.md`** — Multi-Agent-Orchestrierung & Anti-Halluzination: Agenten-Budget nach Risiko-Tier (wie viele wann), disjunkte Stream-Schnitte, Citation-or-void + Source-Abgleich + Konsens-Gate, kalte Zweit-Ableitung, Independent-Verifier-Prompt (Red-Team Ledger↔Diff). **Laden in Phase 1.5 bei Agenten-Fan-out und Phase 5.0 bei NO-FAIL.**
 - **`references/staged-review.md`** — Zwei-Stufen-Implementierungs-Review durch frische Agenten: Spec-Compliance (under/over-built · misinterpret · unsourced) ZUERST, dann Code-Quality (Duplizierung · Fehlerbehandlung · Idiom-Bruch · toter Pfad · Lesbarkeit), mit Prompt-Vorlagen, Risiko-Gate und Fix-Re-Check-Schleife. Eigene Linse **neben** dem Ledger↔Diff-Kreuzaudit (Coverage). **Laden in Phase 5.0b ab Risiko-Signal, Pflicht bei NO-FAIL.**
 - **`references/systematic-debugging.md`** — Root-Cause-First-Debug-Protokoll (4 Phasen: Investigation → Pattern-Analyse → Hypothese/Test → Fix), Red-Flag-Liste, „nach 3 Fehlversuchen Architektur hinterfragen" + konkrete Taktiken (Condition-based Waiting, Test-Env-Guard für destruktive Ops, Defense-in-Depth-Schichten, Test-Pollution-Bisection, Architektur-Erkennungsmuster). Greift wann immer etwas **bricht statt fehlt** (Test rot · `/verify` falsch · Invarianten-Verletzung · Auto-Fix-Thrashing). **Laden in Phase 4/5 ab dem ersten erfolglosen Fix.**
+- **`references/receiving-review.md`** — Externes Review **empfangen** (Gegenstück zu staged-review, das Review *gibt*): Feedback von Mensch/Tool/Auditor klassifizieren (Real/kontext-blind/halluziniert/unklar), am Source validieren, begründeter Pushback mit Code-/Test-Beleg, Eskalation bei Konflikt mit Vorentscheidung, echte Bugs ins E-Ledger. **Laden in Phase 5, wenn externes Feedback ankommt.**
 - **`references/modeling.md`** — State-Table-Templates, Invarianten-Katalog, Falsy-Entscheidungsmatrix, Contract-/Idempotenz-/Nebenläufigkeits-Checklisten. **Laden in Phase 2 bei State-/Async-/Daten-Änderungen.**
 - **`references/security-pass.md`** — Der Security-Engineer-Schnelldurchgang (Authz/IDOR, Injection-Klassen, Secrets, Open-Redirect/SSRF, Falsy-as-Bypass) + Eskalations-Regel wann die NO-FAIL-`zero-fail-zones.md` zu ziehen ist. **Laden in Phase 2.5, Pflicht bei NO-FAIL.**
 - **`references/verification.md`** — Test-Tier-Entscheidungsbaum, jsdom-Fallen-Katalog, Orchestrierung von `/feature-testing` + `/verify` (inkl. `AN /verify`-Handoff), Real-Stack-Smoke-Rezept (Clean-Bring-up), manueller Fallback. **Laden in Phase 3 & 5.**
 - **`references/security-hardening.md`** — Enterprise-Härtung gegen die komplette Angriffs-Taxonomie (OWASP + API Security Top 10), AuthN/AuthZ/Session, **Paywall-/Abuse-Resistenz** (VPN/IP/Geo, Coupon-/Trial-Abuse, Webhook-Integrität), Supply-Chain, Header/DoS/Daten. **Laden in P2.5 & P5; Pflicht bei NO-FAIL und bei Payment/Zugang.**
 - **`references/threat-intel.md`** — Protokoll des täglichen Threat-Intel-Refresh: Stamp-Mechanismus (1×/Tag pro Projekt), Stack-Erkennung, Such-Quellen (CVE/GHSA/OWASP), Exposure-Check & Eskalation. **Laden in der Pre-flight.**
 - **`references/rollout.md`** — Nach-SHIP-Hälfte: Expand-Contract-Rückwärtskompatibilität (nullable-first, dual-write, Feld-/Enum-/Queue-Migration), phasenweiser Rollout + Feature-Flag + Kill-Switch ohne Redeploy, Rollback-Plan (`migration down` getestet, Daten forward-kompatibel), Post-Ship-Observability (Log/Metrik/Alert/Invarianten-Monitor), Zero-Customer-Impact-Sequenzierung. **Laden in Phase 3.4 (Strategie) & Phase 7 (Ausführung) bei Prod-Changes mit aktiven Kunden.**
+- **`references/branch-finish.md`** — Branch-Abschluss nach SHIP/Rollout: Disposition (lokal mergen vs. PR/MR vs. Archiv), Delivery-Report als PR-Body, **forge-agnostischer** Handoff (git push universal, PR-Erstellung je Forge, sonst manuelles Handoff), Post-Merge-Retest (Spot-Check kritischer Ledger-Stellen + Real-Stack-Smoke + Invarianten). **Laden in Phase 7.1 nach belegtem Rollout.**
 - **`references/e2e-clickthrough.md`** — Voll-Protokoll für End-to-End User-Klick-Through: das 10-Stage-Skript, Browser-Agent-Patterns (Playwright/agent-browser/MCP-Chrome), Mailbox-Strategien (Mailtrap/Mailpit/Gmail), Stripe-Test-Karten-Katalog, Screenshot-Disziplin, BLOCKIERT-Bedingungen je Stufe. **Laden in Phase 5.5; Pflicht bei jeder User-Journey-Änderung.**
 - **`references/multi-repo-journey.md`** — Cross-Repo-Onboarding/Cross-Service-State-Übergänge: Journey-Tabellen-Template, Webhook-Idempotenz-Checks, Auth-Hash-Identitäts-Beweis, Eventual-Consistency-Marker. **Laden in Phase 1.7 & 5.8.**
 - **`references/wip-scanner.md`** — Dummy/Placeholder/Mock-Detection: vollständige Grep-Patterns, Entscheidungs-Matrix pro Treffer, Ersetzungs-Patterns für typische WIP-Klassen (Stripe-Test-Pläne, Dummy-Mailadressen, Lorem-Ipsum-Marketing-Text). **Laden in Pre-flight Teil 2 & Phase 4.5.**
