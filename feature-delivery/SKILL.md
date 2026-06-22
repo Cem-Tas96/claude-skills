@@ -12,7 +12,11 @@ description: >
   (Test-Beweis), /verify (Real-Runtime-Beweis) und /security-review (Diff-Security). Führt bei jedem Aufruf
   einmal täglich einen Threat-Intel-Refresh aus (neueste CVEs/Angriffe → Exposure-Check gegen unseren Code) und
   härtet auf Enterprise-Security-Niveau inkl. Paywall-/Abuse-Schutz (VPN/IP/Geo, Coupon-Abuse). Ergänzt
-  /performance-boost. Denkt wie IT-Architekt + Security-Engineer.
+  /performance-boost. Denkt wie IT-Architekt + Security-Engineer. Läuft als autonome LOOP-ENGINE
+  (Loop Engineering): jeder Aufruf gibt dem Lauf EIN Ziel und er promptet sich selbst — findet die Arbeit,
+  erledigt sie, prüft sie mit unabhängigen Subagenten (Writer ≠ Reviewer), merkt den Fortschritt in einem
+  durablen Checkpoint und macht weiter bis die DoD wirklich erfüllt ist. Nutzt die fünf Loop-Bausteine
+  (Automation/Worktrees/Skills/Connectors/Subagents) risiko-proportional statt Hand-Holding.
 ---
 
 # Feature-Delivery Skill — Enterprise Zero-Regression Implementation
@@ -46,8 +50,11 @@ description: >
 > **Der Client ist feindlich; die neueste Lücke ist noch nicht in deinem Wissen.**
 > Geld, Zugang und Berechtigung entscheidet der Server aus der Quelle der Wahrheit — nie aus IP, Geo, VPN-Erkennung oder einem Client-Flag. Und weil täglich neue Angriffe erscheinen, prüfst du bei jedem Lauf einmal die frischeste Bedrohungslage, statt dich auf Gestern zu verlassen. „Unhackbar" verspricht niemand — aber jede bekannte Klasse ist bewusst gedeckt und kein kritischer Pfad geht ungeprüft live.
 
+> **Du schreibst keine Prompts mehr — du baust die Schleife.**
+> Prompt-Engineering hält dich im Hin-und-Her: du nimmst den Agenten bei jedem Schritt an die Hand. Loop-Engineering dreht das um — du gibst **ein Ziel**, und der Lauf promptet sich selbst: er findet die Arbeit, erledigt sie, prüft sie (mit einem **unabhängigen** Subagenten — wer schreibt ist nicht wer bewertet), merkt den Fortschritt in einem **durablen Checkpoint** und macht weiter, **bis die DoD wirklich erfüllt ist** — nicht bis der Prompt endet. Dieser Skill IST diese Schleife; die Phasen unten sind ihr Körper. Voll-Protokoll: `references/loop-engine.md`.
+
 > **Brute-Force-Loops sind kein Skill, sondern Token-Waste.**
-> 10x denselben Skill im Loop laufen lassen "bis er kein Bock mehr hat" produziert mit der 4. Iteration kein neues Wissen mehr. **Coverage-Wachstum messen**: 3 Iterationen ohne neue Ledger-Zeile → STOPP, das Verbleibende braucht entweder eine andere Methode (Klick-Through, Spec-Quelle, menschliche Entscheidung) oder ist außerhalb der erreichbaren Coverage.
+> 10x denselben Skill im Loop laufen lassen "bis er kein Bock mehr hat" produziert mit der 4. Iteration kein neues Wissen mehr. **Coverage-Wachstum messen**: 3 Iterationen ohne neue Ledger-Zeile → STOPP, das Verbleibende braucht entweder eine andere Methode (Klick-Through, Spec-Quelle, menschliche Entscheidung) oder ist außerhalb der erreichbaren Coverage. „Immer loopen" heißt **nicht** „immer maximale Automatik": die Schleife läuft bei jedem Aufruf, ihre Autonomie-Tiefe (inline → Wake-up → Cron → Worktree-Fächer) skaliert mit der Arbeit.
 
 **Du bist nicht fertig wenn der Happy-Path läuft. Du bist fertig wenn jede betroffene Stelle nachweislich angefasst, jede Transition abgedeckt, jeder Reverse-Pfad symmetrisch gebaut, jede UI-Aussage aus einer benannten Quelle belegt, jeder Dummy ersetzt, jede User-Journey end-to-end im echten Browser geklickt, jede Mail visuell im echten Client gerendert und jedes Plan-Limit adversarial getriggert ist.**
 
@@ -57,18 +64,26 @@ Er existiert um genau eine Sache zu erreichen: **1 Prompt → vollständig & kor
 
 ---
 
-## BETRIEBS-MODUS: Ein-Prompt-Autonomie
+## BETRIEBS-MODUS: LOOP-ENGINE (autonome Selbst-Prompting-Schleife)
 
-Der Boss gibt oft **einen knappen Prompt** ("Bau X", "Fix Y") und erwartet ein fertiges, bugfreies Feature — nicht eine Rückfrage-Kaskade und nicht vier Folgekommits.
+> **Jeder Aufruf dieses Skills startet eine Schleife, keinen Einmal-Lauf.** Du bekommst **ein Ziel** und der Lauf promptet sich selbst durch die Phasen, bis die DoD wirklich erfüllt ist. Das ist Loop-Engineering: das System, das den Agenten für dich promptet, statt ihn an die Hand zu nehmen. Voll-Protokoll: `references/loop-engine.md`.
 
-**So verhältst du dich:**
+**Der Antrieb läuft IMMER (bei jedem Aufruf, auch dem kleinsten):**
+1. **Ziel** als Contract (P0) festnageln.
+2. **Checkpoint laden/anlegen** (`references/loop-engine.md` §2) — der durable Spiegel von Ledger + Loop-Status unter `~/.claude/.cache/feature-delivery/<slug(pwd)>.loop.json`. Existiert er → **resumen** (ab `phaseCursor` weiter, DONE-Bedingung neu prüfen); sonst neu anlegen.
+3. **Iterieren** — jede Runde: **ASSESS** (nächste unerledigte Arbeit aus dem Ledger ableiten — nicht „und jetzt?" fragen) → **ACT** (genau diese eine Arbeit tun) → **VERIFY** (frischer Subagent prüft, Writer ≠ Reviewer) → **RECORD** (Checkpoint schreiben, Coverage-Delta messen) → **DECIDE** (DoD erfüllt? → terminal; offen + Wachstum? → weiter; 3× kein Wachstum? → eskalieren) → **CONTINUE** (inline weiter oder Wiederaufruf takten).
+4. **Enden nur an der DONE-Bedingung** (DoD P6.1 vollständig ✔, 0 `offen`) oder einer Stop-Garantie (Diminishing-Returns / NEEDS_CONTEXT / BLOCKIERT) — **nicht** weil „der Prompt zu Ende ist".
+
+**Autonomie-Tiefe ist tiered (nicht „immer maximale Automatik"):** inline-Selbst-Prompting ist der Default; `Monitor`/`ScheduleWakeup`/`/loop` nur wenn der Lauf auf einen externen Zustand wartet (CI/Deploy/Migrations-Fenster/externes Review — ereignisgetrieben via `Monitor` bevorzugt, sonst selbst-getaktetes Pollen); `/schedule`+`CronCreate` nur für wiederkehrende Pflichten; `isolation:"worktree"` nur bei echter Parallel-Mutation. Darunter liegt die **harness-getriebene `settings.json`-Hook-Schicht** (SessionStart/Stop/PostToolUse, via `/update-config`) — automatisierte Verhaltensweisen, die der **Harness** ausführt, nicht der Agent (z.B. der SessionStart-Auto-Pull dieses Skills-Repos). Welche Automation-Primitive verfügbar sind, via `ToolSearch` prüfen statt annehmen; Mechanik skaliert mit der Arbeit (`references/loop-engine.md` §1/§7).
+
+**Verhaltensregeln innerhalb der Schleife:**
 
 1. **Niemals sofort coden.** Erst Phase 0–2 (Contract → Blast-Radius → Modellierung) durchlaufen. Das ist autonome Vorarbeit, dafür musst du nicht fragen.
-2. **Nur EINMAL fragen — und nur bei einer konsequenten Gabel** die du nicht aus dem Code beantworten kannst (z.B. zwei legitime Produktverhalten, Datenverlust-Risiko, irreversible Migration). Dann gebündelt via einer einzigen Rückfrage. Alles was aus Code, Spec, Git-History oder Konvention ableitbar ist: **selbst entscheiden und im Report notieren** — nicht fragen.
-3. **Unvollständigkeit IMMER VOR dem Commit melden.** Wenn du während der Implementierung merkst dass die State-Table oder das Coverage-Ledger eine Lücke hatte: sag es, erweitere das Ledger, baue nach — **bevor** du committest. Niemals als Folgekommit. (Das ist die #1-Ursache der historischen 4-Commit-Ketten.)
-4. **Liefere mit Beweis, nicht mit Behauptung.** Der Delivery-Report (Phase 6) ist Pflicht. "Done" ohne abgehaktes Coverage-Ledger ist verboten.
+2. **Nur EINMAL fragen — und nur bei einer konsequenten Gabel** die du nicht aus dem Code (oder einem verbundenen Connector, P1.8 / `loop-engine.md` §8) beantworten kannst (z.B. zwei legitime Produktverhalten, Datenverlust-Risiko, irreversible Migration). Dann gebündelt via einer einzigen Rückfrage → Loop pausiert als NEEDS_CONTEXT. Alles was aus Code, Spec, Connector, Git-History oder Konvention ableitbar ist: **selbst entscheiden und im Report notieren** — nicht fragen.
+3. **Unvollständigkeit IMMER VOR dem Commit melden.** Wenn du während der Implementierung merkst dass die State-Table oder das Coverage-Ledger eine Lücke hatte: sag es, erweitere das Ledger (→ neue Ledger-Zeile + Checkpoint), baue nach — **bevor** du committest. Niemals als Folgekommit. (Das ist die #1-Ursache der historischen 4-Commit-Ketten.)
+4. **Liefere mit Beweis, nicht mit Behauptung.** Der Delivery-Report (Phase 6) ist Pflicht. "Done" ohne abgehaktes Coverage-Ledger ist verboten. **Selbst-Prompting heißt nicht selbst-genehmigend:** die Schleife darf sich nie selbst SHIP geben, solange eine DoD-Box offen ist.
 
-> Tempo entsteht nicht durch früheres Coden — sondern dadurch dass du nicht viermal zurück musst.
+> Tempo entsteht nicht durch früheres Coden — sondern dadurch dass du nicht viermal zurück musst, und dass die Schleife ohne Hand-Holding weiterläuft, bis sie nachweislich fertig ist.
 
 ---
 
@@ -76,11 +91,22 @@ Der Boss gibt oft **einen knappen Prompt** ("Bau X", "Fix Y") und erwartet ein f
 
 Dieser Skill ist der **äußere Loop** (vollständig & korrekt bauen). `/feature-testing` ist der **Test-Modul darin** (Verhalten beweisen). Doppelung wird bewusst vermieden — Test-Strategie, Test-Quality-Gates und Auto-Fix-Loop gehören `/feature-testing`, nicht hierher.
 
-```
-   /feature-delivery — der äußere Loop:
+> **Das ist Loop-Baustein 3 (Skills):** dieser Skill + die Sub-Skills (`/feature-testing` · `/verify` · `/security-review` · `/code-review` · `/simplify`) + der `CLAUDE.md`/`AGENTS.md`-Projektkontext sorgen dafür, dass die Schleife das Projekt **nicht jedes Mal neu erklärt** bekommen muss — sie kennt es aus den geladenen Skills und der Projekt-Doku.
 
-   PRE-FLIGHT  Threat-Intel-Refresh (1×/Tag: neueste CVEs/Angriffe → Exposure-Check)
-               + Branch-Safety-Gate (Arbeits-Branch oder dokumentierter Consent)
+```
+   /feature-delivery — die LOOP-ENGINE (jeder Aufruf = eine Schleife, nicht ein Einmal-Lauf):
+
+   ┌────────────────────────────────────────────────────────────────────────────┐
+   │ LOOP-ENGINE-ANTRIEB (läuft immer · references/loop-engine.md)               │
+   │   GOAL = Contract · CHECKPOINT laden/anlegen (durabel, überlebt Wake-up)    │
+   │   Iteration: ASSESS → ACT → VERIFY(Writer≠Reviewer) → RECORD → DECIDE       │
+   │   Ende NUR an DONE-Bedingung (DoD ✔ · 0 offen) oder Stop-Garantie           │
+   └────────────────────────────────────────────────────────────────────────────┘
+        │  (Phasen P0–P7 sind der Körper der Schleife)
+        ▼
+   PRE-FLIGHT  Loop-Checkpoint laden → Resume oder neuer Loop
+               + Threat-Intel-Refresh (1×/Tag: neueste CVEs/Angriffe → Exposure-Check)
+               + Branch/Worktree-Isolations-Gate (Arbeits-Branch; Worktree bei Parallel-Mutation)
                + WIP-Scan (Dummy/Placeholder/Mock/TODO im berührten Code)
                + Grün-Baseline-Gate (existierende Suite vor dem Edit grün, wenn nicht trivial)
         ↓
@@ -119,25 +145,46 @@ Dieser Skill ist der **äußere Loop** (vollständig & korrekt bauen). `/feature
          • invoke /security-review   (Diff-Security gegen heutige Threat-Intel)
          • optional /performance-boost (Hot-Path)
         ↓
-   P6  DoD + Delivery-Report  →  SHIP / BLOCKIERT
-        ↓
+   P6  DECIDE: DoD + Delivery-Report + Checkpoint schreiben
+        →  offen & Coverage wuchs  → CONTINUE  ──►► PRE-TERMINAL-RÜCKSPRUNG direkt zu ASSESS (ohne P7)
+        →  3× kein Wachstum        → STOP-1 Diminishing-Returns (anderes Werkzeug, §u.)
+        →  Entscheidung/Info fehlt  → STOP-2 NEEDS_CONTEXT (die EINE Frage)
+        →  harter Bug              → STOP-3 BLOCKIERT (Root-Cause file:line)
+        →  DoD ✔ & 0 offen         → terminal: SHIP / DONE_WITH_CONCERNS  ↓ (nur hier geht's zu P7)
    P7  Rollout (rückwärtskompatibel · Flag/Kill-Switch · Rollback · Observability)
+       + Branch-Finish + Checkpoint archivieren/löschen (erledigter Loop ≠ Resume)
        + Wirksamkeits-Signal (fing der Aufwand etwas? → Feedback-Loop)
+       ──►► optionale Folge-WELLE (Monitor/ScheduleWakeup/Cron-getaktet) startet einen NEUEN Loop
+            (frischer Checkpoint, nicht Resume des erledigten) — nur wenn weitere Wellen geplant sind.
 
-   LOOP-DISZIPLIN: Coverage-Diminishing-Returns-Stopp
-       3 Iterationen ohne neue Ledger-Zeile / ohne neue Gefundene Stelle → STOPP.
+   STOP-1 — LOOP-DISZIPLIN (Coverage-Diminishing-Returns):
+       3 Iterationen ohne neue Ledger-Zeile / ohne neue gefundene Stelle → STOPP.
        Weiteres Hämmern produziert kein neues Wissen — entweder anderes Werkzeug
-       (Klick-Through · Spec-Quelle · menschliche Entscheidung) oder das Verbleibende
-       ist außerhalb der erreichbaren Coverage. Brute-Force ist Token-Waste.
+       (Klick-Through · Spec-Quelle/Connector · menschliche Entscheidung) oder das
+       Verbleibende ist außerhalb der erreichbaren Coverage. Brute-Force ist Token-Waste.
+       Triggert KEIN Modell-Upgrade und keine höhere Agenten-Kopfzahl.
 ```
 
-**Reihenfolge ist nicht verhandelbar:** zuerst (1×/Tag) der Threat-Intel-Refresh, dann Blast-Radius & Modell, dann Code, dann `/feature-testing` → `/verify` → `/security-review`. Wer `/feature-testing` vor vollständiger Implementierung laufen lässt, beweist eine halbe Implementierung.
+**Reihenfolge ist nicht verhandelbar:** zuerst Loop-Checkpoint laden (Resume?), dann (1×/Tag) der Threat-Intel-Refresh, dann Blast-Radius & Modell, dann Code, dann `/feature-testing` → `/verify` → `/security-review`. Wer `/feature-testing` vor vollständiger Implementierung laufen lässt, beweist eine halbe Implementierung. Der Loop-Antrieb (`references/loop-engine.md`) trägt diese Reihenfolge über alle Iterationen — er ersetzt keine Phase, er ordnet sie als Schleifen-Körper an.
 
 Wenn `/feature-testing` im Projekt nicht verfügbar ist: Phase 5 trotzdem durchführen, dabei die Test-Disziplin aus `references/verification.md` inline anwenden.
 
 ---
 
-## PRE-FLIGHT — TÄGLICHER THREAT-INTEL-REFRESH (läuft bei JEDEM Aufruf zuerst)
+## PRE-FLIGHT — LOOP-INIT + GATES (läuft bei JEDEM Aufruf zuerst)
+
+### Pre-Flight Teil 0 — LOOP-CHECKPOINT (Resume oder neuer Loop) ★ macht den Lauf zur Schleife
+
+> **Zweck:** Den durablen Loop-Zustand laden, bevor irgendetwas anderes passiert — so überlebt die Schleife Context-Kompaktierung und Wake-ups und „weiß, wann sie fertig war". Voll-Protokoll: `references/loop-engine.md` §2.
+
+1. **Checkpoint-Pfad** bilden: `~/.claude/.cache/feature-delivery/<slug(pwd)>.loop.json` (slug = `pwd`, führender Slash weg, restliche `/` → `-`; identische Konvention zum Threat-Intel-Stamp).
+2. **Existiert die Datei** → **RESUME**: `goal`, `tier`, `ledger`, `phaseCursor`, `doneBoxes`, `status` laden. Ist `status` terminal (SHIP/…) und das aktuelle Ziel deckt sich → der Loop ist erledigt; **nicht** fälschlich weiterlaufen (neuer Auftrag = neuer Checkpoint). Sonst ab `phaseCursor` weiter, DONE-Bedingung neu prüfen.
+3. **Fehlt die Datei** → **NEUER LOOP**: nach P0 (Contract) anlegen; `status="RUNNING"`, `phaseCursor="P0"`.
+4. **Nach jeder Iteration** den Checkpoint schreiben (RECORD-Schritt) — er ist die einzige Wahrheit, auf die ein Wiederaufruf vertrauen darf. `ts` von außen stempeln (kein `Date.now()` in Subagenten/Workflows).
+
+> Rein lokal (eine JSON-Datei), kostet nichts, läuft immer — auch bei winzigen Changes. Der Unterschied zwischen „Loop" und „Einmal-Lauf mit Loop-Vokabular" ist genau dieser Schritt.
+
+### Pre-Flight Teil 1 — TÄGLICHER THREAT-INTEL-REFRESH
 
 > **Zweck:** einmal pro Kalendertag die frischeste Bedrohungslage aus dem Netz ziehen und prüfen ob WIR exponiert sind — schließt die Lücke zwischen Modell-Wissensstand und *heute*. Voll-Protokoll: `references/threat-intel.md`.
 
@@ -153,16 +200,19 @@ Wenn `/feature-testing` im Projekt nicht verfügbar ist: Phase 5 trotzdem durchf
 
 > Läuft IMMER zuerst, auch bei winzigen Changes. Schon heute geprüft → nicht nochmal online, einfach weiter. Das ist die *frische* Hälfte der Security; die *statische* Hälfte (komplette Angriffs-Taxonomie + Paywall-Härtung) ist `references/security-hardening.md`.
 
-### Pre-Flight Teil 1b — BRANCH-SAFETY-GATE (vor Phase 0, Pflicht)
+### Pre-Flight Teil 1b — BRANCH/WORKTREE-ISOLATIONS-GATE (vor Phase 0, Pflicht)
 
-> **Zweck:** Der Default-Branch ist das Bild der Wahrheit für produktive Systeme. Direkt dort mutieren — ohne umkehrbaren Kontext — ist ein Reversibilitäts-Verstoß gegen den Kern-Geist dieses Skills. Ein Arbeits-Branch ist die billigste Absicherung überhaupt und kostet Sekunden.
+> **Zweck:** Der Default-Branch ist das Bild der Wahrheit für produktive Systeme. Direkt dort mutieren — ohne umkehrbaren Kontext — ist ein Reversibilitäts-Verstoß gegen den Kern-Geist dieses Skills. Ein Arbeits-Branch ist die billigste Absicherung überhaupt und kostet Sekunden. Bei **Parallel-Mutation** (Loop-Baustein 2) wird der Branch zum **Worktree** erweitert, damit gleichzeitig arbeitende Agenten sich nicht in die Quere kommen.
 
 1. **Branch erkennen** — nur wenn das Projekt ein Git-Repo ist (sonst `N/A — kein Git` und weiter): aktuellen Branch lesen und gegen den **erkannten Default** prüfen (`git symbolic-ref refs/remotes/origin/HEAD` → Default-Name; Fallback `main`/`master`).
 2. **Ist der aktuelle Branch der Default → Gate greift.** Auflösung in dieser Reihenfolge:
    - **(a) Automatisch branchen** — knapper Name aus dem Contract (`feature/…` / `fix/…`); alle weiteren Commits gehen dorthin.
    - **(b) Mehrere legitime Namen / unklarer Scope** → die EINE gebündelte Rückfrage mit konkretem Vorschlag (Ein-Prompt-Autonomie), nicht eine Frage-Kaskade.
    - **(c) Expliziter Consent** des Bosses („direkt auf den Default") → als `CONSENT: direct-on-default` im Delivery-Report dokumentieren (selten, braucht bewusste Freigabe).
-3. **Nie still auf dem Default editieren.** Das Ergebnis (`Branch: feature/…` oder Consent) gehört ins Feld `Branch:` des Delivery-Reports (P6.2).
+3. **Isolations-Tier wählen (Loop-Baustein 2, `references/loop-engine.md` §9):**
+   - **Sequenzieller Einzel-Change** → Arbeits-Branch genügt, kein Worktree-Overhead.
+   - **Parallele mutierende Stränge** (zwei Features gleichzeitig · Workflow-`agent()`-Stränge die Dateien schreiben) → **`isolation:"worktree"`** je Strang bzw. `EnterWorktree` für interaktive Stränge; Pfad ins Checkpoint-Feld `worktree`. Read-only Recon/Verifikation (`Explore`) braucht **keinen** Worktree.
+4. **Nie still auf dem Default editieren.** Das Ergebnis (`Branch: feature/…` / Worktree-Pfad / Consent) gehört ins Feld `Branch:` des Delivery-Reports (P6.2).
 
 > **Projekt-agnostisch:** gilt für jeden Forge/Stack (GitHub/GitLab/Bitbucket/lokal). Kein Git-Repo → das Gate entfällt **dokumentiert** (`N/A — kein Git`), der Lauf geht weiter.
 
@@ -332,8 +382,9 @@ S7      | flow · login                  | Email + dasselbe PW | Session        
 1. **Quelle benennen** — pro Stelle eine Antwort auf: „**Woher** stammt dieser Text/Preis/Limit?"
    - Akzeptable Quellen: Notion-Page (URL), Spec-Dokument im Repo (Pfad), CMS-Eintrag (ID), Stripe-Dashboard (Product-ID + Price-ID), DB-Tabelle (Tabelle + Row), Mail-Template-Vorlage (Pfad).
    - Inakzeptabel: „aus dem Modell", „plausibel klingend", „so wie es bei Konkurrenten ist", „Cem hatte das mal gesagt" (ohne dokumentierte Quelle).
-2. **Quell-Inhalt vs. Code-Inhalt diff'en** — die Werte im Code Zeichen-für-Zeichen mit der Quelle vergleichen. Abweichung → `WIP-REPLACE` ins Ledger.
-3. **Fehlt eine Quelle** für eine UI-Behauptung → **STOP**, beim Boss/Owner gebündelt nachfragen (eine einzige Rückfrage, nicht je Stelle). Keine plausibel klingenden Marketing-Texte erfinden.
+   - **Connector zuerst (Loop-Baustein 4):** ist ein Notion-/CMS-/Ticket-Connector verbunden, die Quelle **direkt ziehen** (`notion-search`/`notion-fetch` via `ToolSearch`) statt zu fragen — der gezogene Wert ist eine benannte Quelle (Page-ID/URL). Voll: `references/loop-engine.md` §8.
+2. **Quell-Inhalt vs. Code-Inhalt diff'en** — die Werte im Code Zeichen-für-Zeichen mit der Quelle (Repo-Spec ODER gezogenem Connector-Inhalt) vergleichen. Abweichung → `WIP-REPLACE` ins Ledger.
+3. **Fehlt eine Quelle** für eine UI-Behauptung (und kein Connector liefert sie) → **STOP**, beim Boss/Owner gebündelt nachfragen (eine einzige Rückfrage, nicht je Stelle) → Loop pausiert als NEEDS_CONTEXT. Keine plausibel klingenden Marketing-Texte erfinden.
 4. **Plan-Limits/Preise speziell:** zusätzlich gegen die **Stripe-Konfiguration** (Product+Price+Metered-Components) diff'en. Wenn UI „1.000.000 Aktionen / Monat" zeigt aber Stripe-Plan hat kein metered-Quota dafür → ist die Behauptung nicht enforced (Lücke 8). → ins Ledger als `SPEC-SOT-MISMATCH`.
 
 > **Faustregel:** Wenn nach dem Ship eine Person fragt „warum steht da '5 Nutzer-Accounts'?", muss eine Antwort der Form „weil das in [Quell-URL] so steht" möglich sein. Sonst gehört der Text dort nicht hin.
@@ -680,8 +731,9 @@ Aus der Journey-Tabelle ableiten:
 ## PHASE 6 — DEFINITION OF DONE & DELIVERY-REPORT
 
 ### 6.1 DoD-Checkliste (jede Box muss ✔ sein)
+- [ ] **Loop-Engine geführt (P0/Pre-flight Teil 0)** — Checkpoint angelegt/resumed & bei jeder Iteration geschrieben; `status` an `doneBoxes` gekoppelt (kein selbst-vergebenes SHIP); Autonomie-Tier passend (inline Default, Wake-up/Cron/Worktree nur gegen konkretes Warten/Parallel-Problem); bei SHIP Checkpoint archiviert/gelöscht — Selbstaudit `references/loop-engine.md` §11
 - [ ] **Coverage-Ledger vollständig** — jede Zeile ✓ oder `N/A (+Grund)`, keine `offen`
-- [ ] **Branch-Safety-Gate (Pre-flight)** — nicht auf dem Default-Branch mutiert: Arbeits-Branch angelegt (`Branch:` im Report) **oder** dokumentierter `CONSENT: direct-on-default` **oder** `N/A — kein Git`
+- [ ] **Branch/Worktree-Isolations-Gate (Pre-flight)** — nicht auf dem Default-Branch mutiert: Arbeits-Branch angelegt (`Branch:` im Report) **oder** `isolation:"worktree"`-Strang bei Parallel-Mutation **oder** dokumentierter `CONSENT: direct-on-default` **oder** `N/A — kein Git`
 - [ ] **WIP-Scan abgehandelt** — jeder Pre-flight-Treffer (`TODO|DUMMY|HARDCODED|…`) ist `✓ (ersetzt)` oder `N/A (+Datei-Pfad als Test/Doc-Beleg)`
 - [ ] **Produktions-Hygiene** — kein test-only-Code in Produktionsklassen (Iron-Law, `wip-scanner.md` §6); keine reinen Mock-Assertions ohne Verhaltens-Beweis (`/feature-testing` Gate 7)
 - [ ] **Reverse-Pfade** im selben Change angefasst (oder `N/A` begründet) — inkl. **Mail-Symmetrien** aus P2.6
@@ -713,7 +765,8 @@ Aus der Journey-Tabelle ableiten:
 - [ ] **Tier-Floor-Gate** angewandt — Auth/Payment/Rollen/PII/Migration berührt → NO-FAIL gesetzt (nicht per Ermessen heruntergestuft)
 - [ ] **Rollout (P7)** für Prod-Changes belegt — rückwärtskompatibel, Kill-Switch (NO-FAIL), Rollback getestet, Observability live (oder `N/A` begründet bei rein lokalem Tooling)
 - [ ] **Branch-Finish (P7.1)** — Disposition gewählt (lokal/PR/Archiv, NO-FAIL→Review), Report als PR-Body/Handoff, Post-Merge-Retest bei NO-FAIL durchgeführt (oder `N/A`)
-- [ ] **Loop-Disziplin** — nicht im Brute-Force-Loop gefahren; keine 3 aufeinanderfolgenden Iterationen ohne neue Ledger-Zeile / neue Coverage
+- [ ] **Loop-Disziplin** — nicht im Brute-Force-Loop gefahren; keine 3 aufeinanderfolgenden Iterationen ohne neue Ledger-Zeile / neue Coverage; bei Stall auf anderes Werkzeug eskaliert (Klick-Through/Connector/menschliche Entscheidung), kein Modell-Upgrade/Kopfzahl-Hochfahren (STOP-1, `loop-engine.md` §4)
+- [ ] **Writer ≠ Reviewer (Loop-Baustein 5)** — der VERIFY-Schritt lief durch einen frischen, von der Implementierung unabhängigen Subagenten (kein Recon-Stream, der nur sich selbst bestätigt); Output durchs Anti-Halluzinations-Gate
 - [ ] **Graded-Status konsequent (P6.2b)** — SHIP nur bei 0 offen; DONE_WITH_CONCERNS nur mit benannten Concerns + Owner + Deadline; NEEDS_CONTEXT mit der einen Frage; BLOCKIERT mit Root-Cause (file:line/Artefakt)
 - [ ] **Commit-Message** benennt Invariante & Reverse-Pfad (nicht nur das Symptom)
 
@@ -726,9 +779,17 @@ Aus der Journey-Tabelle ableiten:
 FEATURE DELIVERY REPORT
 ═══════════════════════════════════════════════════════
 Feature:        [Name]            Projekt: [Repo]
-Branch:         [feature/… angelegt | Default + CONSENT: direct-on-default | N/A — kein Git]
+Branch:         [feature/… angelegt | isolation:worktree-Strang | Default + CONSENT: direct-on-default | N/A — kein Git]
 Risiko-Tier:    NO-FAIL / LOW-FAIL / BEST-EFFORT
 Test-Tier:      Unit / Integration / Real-Browser / Real-Stack-Smoke  (Begründung)
+
+LOOP-ENGINE
+  Automation-Modus:  inline / Monitor / ScheduleWakeup / Cron-Routine   (Begründung des Tiers)
+  Checkpoint:        [Pfad · n Iterationen · resumed? · bei SHIP archiviert/gelöscht]
+  Iterationen:       [n — letzte coverageDelta · coverageStall-Stand]
+  Writer ≠ Reviewer: [VERIFY durch unabhängigen Subagenten? ja/Selbst-Audit + Grund]
+  Connectoren:       [gezogen: Notion/M365/… für Spec-Quelle (P1.8) | zurückgeschrieben: Report (6.2c) | keiner verfügbar]
+  Stop-Grund:        [DONE (DoD ✔) / Diminishing-Returns / NEEDS_CONTEXT / BLOCKIERT]
 
 CONTRACT
   WAS / WARUM / INVARIANTE / NICHT-ZIEL / AKZEPTANZ
@@ -799,6 +860,14 @@ Context needed (bei NEEDS_CONTEXT): [die EINE Frage → an wen]
 
 > **BLOCKIERT = nichts verlässt den Branch** bis der Grund behoben ist. Ein offenes Coverage-Ledger ist immer BLOCKIERT.
 
+### 6.2c Connector-Write-back (Loop-Baustein 4 — die Schreib-Hälfte, `references/loop-engine.md` §8)
+
+> **Zweck:** Connectoren ziehen nicht nur (P1.8), sie **bedienen** auch — der Loop schreibt das Ergebnis dorthin zurück, wo das Team es erwartet, statt es nur lokal auszugeben.
+
+- Ist ein **Notion-/Ticket-/Chat-Connector** verbunden (via `ToolSearch` geladen): den Delivery-Report (6.2) in die **benannte Quelle** zurückschreiben — Notion-Page-Update / Ticket-Kommentar / Status-Sync (z.B. `notion-update-page`, Ticket-Comment-API). Bei Multi-Repo-Journey (P1.7) den Status an der verlinkten Onboarding-Page/dem Epos aktualisieren.
+- **Kein Connector verfügbar** (oder headless/cron-Lauf ohne interaktive Auth) → Report lokal lassen und im Feld `Connectoren:` notieren („keiner verfügbar — Report lokal").
+- Write-back ist **read-after-write-bewusst:** keine Secrets/Keys aus dem Report in eine extern indizierte Quelle schreiben (CLAUDE.md-Secret-Regel gilt auch für Connector-Ziele).
+
 ### 6.2b Graded Completion Status (Zwischenstufen statt binär)
 
 Damit „funktional fertig, aber außerhalb dieses Prompts hängend" nicht fälschlich als harter Block oder als sauberes SHIP verbucht wird, hat das Urteil vier Stufen:
@@ -813,6 +882,8 @@ Damit „funktional fertig, aber außerhalb dieses Prompts hängend" nicht fäls
 **Concern-Katalog** (löst DONE_WITH_CONCERNS aus — funktional korrekt, aber geschäftlich/architektonisch unvollständig): zurückgestellte Härtung · sekundäre UI fehlt · Eventual-Consistency-Lag · Live-Datenmigration ausstehend · externes Setup nötig (Key/Webhook/Plan) · Observability noch nicht konfiguriert · Kundenkommunikation/Changelog offen · Compliance/Legal-Review offen.
 
 > **Faustregel:** Fehlt **„Code schreiben"** → Bug (BLOCKIERT). Fehlt **„jemand sagt ja / externes Setup / Compliance / Migrations-Fenster"** → Concern (DONE_WITH_CONCERNS mit Owner + Deadline) oder NEEDS_CONTEXT, **kein** Block. Rein über die Art des fehlenden Schritts entschieden — projekt-agnostisch.
+
+> **STOP-1 (Loop-Diminishing-Returns) ist kein eigener Status.** Wenn die Schleife nach 3 Iterationen ohne neue Coverage stoppt (`references/loop-engine.md` §4), wird das Verbleibende **ehrlich auf eine der vier Stufen abgebildet**: braucht es ein anderes Werkzeug/eine Entscheidung → **NEEDS_CONTEXT** (die eine Frage) oder **DONE_WITH_CONCERNS** (benannter Rest + Owner + Deadline); ist eine harte Lücke offen → **BLOCKIERT**. Das Feld `Stop-Grund: Diminishing-Returns` im Report begründet nur, *warum* die Schleife endete — der **Status** bleibt einer der vier.
 
 ---
 
@@ -883,11 +954,18 @@ Damit Disziplin nicht zur ungemessenen Ceremony wird: bei jedem Lauf im Delivery
 | Direkt auf `main`/`master` editiert | irreversibler Live-Edit ohne Draft-Zyklus | Branch-Safety-Gate (Pre-flight) — Arbeits-Branch oder Consent |
 | `BLOCKIERT` mit `DONE_WITH_CONCERNS` verwechselt | Migration/Setup fehlt → Feature fälschlich geblockt (oder still geshippt) | Graded-Status (P6.2b): Code-Bug = BLOCKIERT, Ressourcen-/Entscheidungslücke = Concern/NEEDS_CONTEXT |
 | Externes Review-Finding blind übernommen | Reviewer-Kontextlücke wird zu Folgekommit | Externes Review empfangen (`receiving-review.md`): klassifizieren, am Source validieren, mit Beleg zurückschieben |
+| Hand-Holding statt Schleife | Agent fragt nach jedem Schritt „und jetzt?" | Loop-Engine: ASSESS leitet die nächste Arbeit selbst ab (`loop-engine.md` §3) |
+| Loop ohne Checkpoint | Wake-up/Kompaktierung → Fortschritt verloren, fängt von vorn an | durabler Loop-Checkpoint, bei jeder Iteration geschrieben (Pre-flight Teil 0) |
+| Selbst-vergebenes SHIP | Schleife sagt „fertig", weil der Prompt endet | DONE-Bedingung an DoD-Boxen gekoppelt, nicht an „Agent zufrieden" (`loop-engine.md` §4) |
+| „immer maximale Automatik" | Cron-Routine + Worktree für einen Einzeiler | tiered Autonomie — inline ist der Default (`loop-engine.md` §1) |
+| Writer prüft sich selbst | Agent schreibt sich selbst SHIP | frischer Reviewer-Subagent, Writer ≠ Reviewer (`loop-engine.md` §6) |
+| Connector-Wert ungeprüft übernommen | falscher Spec-Wert aus alter Notion-Page live | Connector-Fund = benannte Quelle, trotzdem Zeichen-für-Zeichen-Diff (`loop-engine.md` §8) |
 
 ---
 
 ## REFERENZ-DATEIEN (bei Bedarf laden)
 
+- **`references/loop-engine.md`** — Der Loop-Engineering-Antrieb, der den ganzen Skill zur autonomen Selbst-Prompting-Schleife macht: die fünf Bausteine (Automation/Worktrees/Skills/Connectors/Subagents) auf konkrete Claude-Code-Primitive abgebildet, das durable Checkpoint-Artefakt („weiß, wann es fertig war"), die Iterations-Mechanik (ASSESS→ACT→VERIFY→RECORD→DECIDE→CONTINUE), die DONE-Bedingung + Stop-Garantien, das Gesetz „immer loopen ≠ immer maximale Automatik" (tiered: inline → Wake-up → Cron → Worktree), die Writer-≠-Reviewer-Invariante, Connector-/Worktree-Operationalisierung. **Laden bei jedem Aufruf (Pre-flight Teil 0) — das ist der Betriebs-Modus, nicht eine Phase.**
 - **`references/blast-radius.md`** — Konkrete Recon-Rezepte: Symbol-Suche, Sub-Agent-Fan-out-Templates, der vollständige Cross-Layer-Kopplungs-Katalog, das Symmetrie-Paar-Katalog, die Coverage-Ledger-Vorlage. **Laden in Phase 1, immer bei nicht-trivialem Blast-Radius.**
 - **`references/multi-agent.md`** — Multi-Agent-Orchestrierung & Anti-Halluzination: Agenten-Budget nach Risiko-Tier (wie viele wann), **Modell-Tier pro Agent (§1.6: günstig für Recon, stark für Verifikation)**, disjunkte Stream-Schnitte, **Subagent-Rekursions-Guard (§2b)**, Citation-or-void + Source-Abgleich + Konsens-Gate, kalte Zweit-Ableitung, Independent-Verifier-Prompt (Red-Team Ledger↔Diff). **Laden in Phase 1.5 bei Agenten-Fan-out und Phase 5.0 bei NO-FAIL.**
 - **`references/staged-review.md`** — Zwei-Stufen-Implementierungs-Review durch frische Agenten: Spec-Compliance (under/over-built · misinterpret · unsourced) ZUERST, dann Code-Quality (Duplizierung · Fehlerbehandlung · Idiom-Bruch · toter Pfad · Lesbarkeit), mit Prompt-Vorlagen, Risiko-Gate und Fix-Re-Check-Schleife. Eigene Linse **neben** dem Ledger↔Diff-Kreuzaudit (Coverage). Inkl. Severity-Kalibrierung (Critical/Important/Minor) + SHA-Anker (`BASE_SHA..HEAD_SHA`) für reproduzierbare Reviews. **Laden in Phase 5.0b ab Risiko-Signal, Pflicht bei NO-FAIL.**

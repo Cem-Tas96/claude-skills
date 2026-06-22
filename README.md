@@ -71,4 +71,5 @@ The `|| true` makes it fail-safe: no internet, merge conflict, whatever — Clau
 
 ## Skills in this repo
 
-- **feature-delivery** — Enterprise-grade implementation discipline: blast-radius mapping → state-table → symmetric rollout → security pass. Use before *and* during any non-trivial code change.
+- **feature-delivery** — Enterprise-grade implementation discipline, run as an autonomous **Loop-Engine** (Loop Engineering): one goal in → the run self-prompts through blast-radius mapping → state-table → symmetric rollout → security pass, verifies with independent subagents (writer ≠ reviewer), remembers progress in a durable checkpoint, and keeps going until the Definition-of-Done is truly met. Uses the five loop building blocks (automation/worktrees/skills/connectors/subagents) risk-proportionally instead of hand-holding. Use before *and* during any non-trivial code change. See `feature-delivery/references/loop-engine.md`.
+- **feature-testing** — Enterprise test automation for any new feature: change analysis → test strategy → implementation → auto-fix loop → quality gates → release. Orchestrated by feature-delivery's verification phase.
