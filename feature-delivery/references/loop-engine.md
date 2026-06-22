@@ -245,3 +245,51 @@ Das Branch-Safety-Gate (Pre-flight 1b) verhindert Edits auf dem Default-Branch. 
 - [ ] **Terminal aufgeräumt** — bei SHIP Checkpoint archiviert/gelöscht, kein Geister-Resume (§2)?
 
 > Kannst du diese Boxen nicht ehrlich abhaken, hast du keinen Loop gebaut — du hast einen Einmal-Lauf mit Loop-Vokabular. Der Antrieb (§1: Ziel · Checkpoint · DONE-Bedingung · Selbst-Prompting) ist das, was die Schleife zur Schleife macht.
+
+---
+
+## 12. Quickstart — Loop Engineering tatsächlich starten (Runbook)
+
+> Die Theorie oben ist der *Antrieb*; dies ist der *Zündschlüssel*. Projekt-agnostisches Schritt-für-Schritt, vom einfachsten Fall (inline) bis „rund um die Uhr ohne dich". Jeder Schritt nennt seinen Baustein. Schnellster Einstieg: **nur Schritt 1–3** — alles darüber ist optionale Automatik-Tiefe.
+
+**Schritt 1 — Ziel geben (statt Prompt schreiben).** Ein Satz genügt; der Lauf macht daraus den Contract (P0):
+```
+/feature-delivery  Bau <X> · Invariante: <was danach gelten muss> · fertig wenn: <Akzeptanz>
+```
+Mehr musst du nicht tippen — der Rest ist die Schleife. Das ist der ganze Punkt von Loop-Engineering: *du gibst ein Ziel, nicht eine Schritt-Anleitung.*
+
+**Schritt 2 — Isolation wählen (Baustein 2 · Worktrees).** Default reicht ein Branch (das Gate macht das selbst). Nur bei **parallelen** Strängen explizit isolieren:
+```
+# ein Strang, sequenziell:           nichts tun — Branch-Gate greift automatisch
+# zwei Features gleichzeitig:         je Strang  isolation:"worktree"  (Agent/Workflow)
+#                                     oder interaktiv:  EnterWorktree
+```
+
+**Schritt 3 — Laufen lassen (inline · der Default).** Nichts weiter nötig: der Lauf iteriert ASSESS→ACT→VERIFY→RECORD→DECIDE→CONTINUE selbst und stoppt erst an der DONE-Bedingung (DoD ✔). Du greifst nur ein, wenn er **NEEDS_CONTEXT** meldet (eine Frage) oder **BLOCKIERT** (ein Bug). Das fühlt sich schon wie „ein Mitarbeiter, der die Aufgabe zu Ende bringt" an — ohne jede Automatik-Einrichtung.
+
+**Schritt 4 — Connectoren scharf schalten (Baustein 4).** Damit der Lauf Spec-Quellen zieht statt zu fragen und den Report zurückschreibt — einmalig prüfen, was verbunden ist:
+```
+ToolSearch  "notion"      # Spec-Source-of-Truth (P1.8) + Report-Write-back (SKILL.md 6.2c)
+ToolSearch  "slack|jira"  # Ticket/Chat — Anforderung ziehen, Status melden
+```
+Fehlt ein Connector → der Lauf fällt sauber auf „STOP & fragen" zurück (kein Halluzinieren).
+
+**Schritt 5 — Unbeaufsichtigt weiterlaufen (Baustein 1 · Automation).** Nur wenn der Lauf **warten** muss oder du „rund um die Uhr" willst — Mechanik nach Bedarf, nicht als Default:
+```
+# wartet auf externen Zustand (CI/Deploy/Review):  Monitor  (ereignisgetrieben, bevorzugt)
+#                                                   oder  ScheduleWakeup  (selbst-getaktet)
+# selbst-getakteter Loop in dieser Session:         /loop            (z.B. Status-Poll)
+# wiederkehrende Routine (cloud, sessionunabhängig): /schedule  +  CronCreate
+```
+Verfügbarkeit via `ToolSearch` prüfen; **jede** Automatik prüft beim Feuern zuerst den Checkpoint-`status` und terminiert, sobald er terminal ist (kein unbeaufsichtigter Token-Brenner).
+
+**Schritt 6 — „läuft von allein" als Harness-Schicht (Baustein 1 · Hooks).** Für Verhalten, das der **Harness** (nicht der Agent) bei Ereignissen ausführt — via `/update-config` in `settings.json`. Beispiel (existiert in diesem Repo bereits als SessionStart-Auto-Pull):
+```json
+{ "hooks": { "Stop": [ { "hooks": [
+  { "type": "command", "command": "git -C \"$PWD\" status --porcelain" }
+] } ] } }
+```
+
+**Schritt 7 — Vertrauen durch Trennung (Baustein 5 · Subagents).** Nichts einzurichten — die Schleife erzwingt es selbst: der Orchestrator schreibt, **frische `Explore`-Agenten** prüfen (writer ≠ reviewer, §6). Du musst dem Ergebnis nicht glauben, weil ein *anderer* Agent es adversarial gegengeprüft hat.
+
+> **Eskalations-Reihenfolge im Zweifel:** erst Schritt 1–3 (inline) — reicht für ~90 % der Changes. Brauchst du Parallelität → Schritt 2-Worktree. Wartet der Lauf auf etwas Externes → Schritt 5. Willst du es nachts/wiederkehrend → Schritt 5-Cron + Schritt 6-Hook. Nie mehr Automatik aufbauen als das konkrete Problem verlangt (§1).
