@@ -5,3 +5,10 @@ Thumbs.db
 .idea/
 .vscode/
 node_modules/
+
+# Lokale Secrets / Verbindungsdaten — NIEMALS committen
+*.local.md
+*.local
+.env
+.env.*
+gameboy-gate/gameboy.local.md
