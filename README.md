@@ -6,23 +6,27 @@ Lives at `~/.claude/skills/` so every Claude Code session in every project picks
 
 ## Install / update on a new machine — one command
 
-> **Repo ist privat.** Voraussetzung einmalig pro Gerät: [GitHub CLI](https://cli.github.com/) installieren und `gh auth login` ausführen (GitHub.com → HTTPS → Browser-Login mit dem Account, der Zugriff aufs Repo hat).
-> Der Installer ruft danach intern `gh auth setup-git` auf, damit auch `git pull/clone` über den gh-Credential-Helper läuft — kein PAT im Klartext.
+> **Public repo** — kein Login/Token nötig. Der Installer installiert `git` automatisch (winget/brew/apt/dnf/pacman/apk), falls es fehlt.
+>
+> ⚠️ Auf **Windows** die PowerShell-Zeile nutzen, nicht die bash-Zeile: in PowerShell ist `bash` das (oft nicht installierte) WSL-bash → `execvpe(/bin/bash) failed`. Die bash-Zeile ist für macOS/Linux/**Git Bash**.
 
 ### macOS / Linux / Windows-Git-Bash
 ```bash
-gh api repos/Cem-Tas96/claude-skills/contents/install.sh -H "Accept: application/vnd.github.raw" | bash
+curl -fsSL https://raw.githubusercontent.com/Cem-Tas96/claude-skills/main/install.sh | bash
 ```
 
 ### Windows PowerShell
 ```powershell
-gh api repos/Cem-Tas96/claude-skills/contents/install.ps1 -H "Accept: application/vnd.github.raw" | iex
+irm https://raw.githubusercontent.com/Cem-Tas96/claude-skills/main/install.ps1 | iex
 ```
+
+> Hinweis: `... | iex` funktioniert mit `irm` (liefert **einen** String). `gh api ... | iex` bricht, weil `gh` zeilenweise ausgibt und PowerShell jede Zeile einzeln an `iex` schickt — falls du `gh` brauchst (z. B. wenn das Repo wieder privat wäre), `gh api ... | Out-String | iex` verwenden.
 
 That's it. The installer:
 1. Clones (or pulls) `~/.claude/skills/`
-2. Adds a SessionStart auto-pull hook to `~/.claude/settings.json` (idempotent — won't duplicate)
-3. Appends a natural-language trigger block to `~/.claude/CLAUDE.md` so Claude in any project recognises `"skills updaten"` / `"<skill> installieren"` and runs the right command
+2. Sets a **global secret-scanning pre-commit hook** (`git config --global core.hooksPath …/hooks`) so Keys/Tokens/`.env`/Private-Keys nie in *irgendein* Repo committet werden — plus lokales Denylist-Template in `~/.config/git/secret-denylist.local.txt`
+3. Adds a SessionStart auto-pull hook to `~/.claude/settings.json` (idempotent — won't duplicate)
+4. Appends a natural-language trigger block to `~/.claude/CLAUDE.md` so Claude in any project recognises `"skills updaten"` / `"<skill> installieren"` and runs the right command
 
 After install: restart Claude Code (`/exit` and reopen) so the new skills load.
 
@@ -73,3 +77,4 @@ The `|| true` makes it fail-safe: no internet, merge conflict, whatever — Clau
 
 - **feature-delivery** — Enterprise-grade implementation discipline, run as an autonomous **Loop-Engine** (Loop Engineering): one goal in → the run self-prompts through blast-radius mapping → state-table → symmetric rollout → security pass, verifies with independent subagents (writer ≠ reviewer), remembers progress in a durable checkpoint, and keeps going until the Definition-of-Done is truly met. Uses the five loop building blocks (automation/worktrees/skills/connectors/subagents) risk-proportionally instead of hand-holding. Use before *and* during any non-trivial code change. See `feature-delivery/references/loop-engine.md`.
 - **feature-testing** — Enterprise test automation for any new feature: change analysis → test strategy → implementation → auto-fix loop → quality gates → release. Orchestrated by feature-delivery's verification phase.
+- **gameboy-gate** — Aufnahmeprüfung für Projekte, die auf dem „Gameboy"-Server (Hetzner CAX11, 4 GB RAM, 2 vCPU) deployt werden: berechnet RAM/CPU-Limits dynamisch aus dem aktuellen Server-Zustand, setzt sie persistent in Coolify, testet unter Last und gibt PASS/FAIL zurück. Server-spezifische Verbindungsdaten liegen lokal in `gameboy-gate/gameboy.local.md` (gitignored), nicht im Repo.
