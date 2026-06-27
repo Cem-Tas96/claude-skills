@@ -115,6 +115,30 @@ if (-not $alreadyInstalled) {
   OK "SessionStart hook already in $Settings"
 }
 
+# 2b. Token-Discipline: effortLevel default + self-healing context hook (idempotent)
+$cfg2 = Get-Content $Settings -Raw | ConvertFrom-Json -AsHashtable
+$tdChanged = $false
+if (-not $cfg2.ContainsKey("effortLevel")) { $cfg2["effortLevel"] = "xhigh"; $tdChanged = $true }
+if (-not $cfg2.ContainsKey("hooks")) { $cfg2["hooks"] = @{} }
+if (-not $cfg2["hooks"].ContainsKey("SessionStart")) { $cfg2["hooks"]["SessionStart"] = @() }
+$haveCtx = $false
+foreach ($entry in @($cfg2["hooks"]["SessionStart"])) {
+  if ($entry.ContainsKey("hooks")) {
+    foreach ($h in @($entry["hooks"])) {
+      if ($h["command"] -match "ensure-context\.sh") { $haveCtx = $true }
+    }
+  }
+}
+if (-not $haveCtx) {
+  $ctxCmd = 'sh "$HOME/.claude/skills/hooks/ensure-context.sh" 2>/dev/null || true'
+  $cfg2["hooks"]["SessionStart"] = @($cfg2["hooks"]["SessionStart"]) + @{ hooks = @(@{ type = "command"; command = $ctxCmd }) }
+  $tdChanged = $true
+}
+if ($tdChanged) { ($cfg2 | ConvertTo-Json -Depth 32) | Set-Content -Encoding UTF8 $Settings }
+# Jetzt einmalig anwenden (Git for Windows liefert sh); fail-safe
+try { & sh "$env:USERPROFILE/.claude/skills/hooks/ensure-context.sh" 2>$null } catch {}
+OK "Token-Discipline aktiv (effortLevel xhigh-Default + Triage-Context-Hook)"
+
 # 3. Patch ~/.claude/CLAUDE.md — add natural-language trigger (idempotent)
 $marker = "<!-- claude-skills-sync:do-not-remove -->"
 $alreadyHas = $false

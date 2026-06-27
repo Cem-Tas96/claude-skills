@@ -20,6 +20,8 @@ triggers:
 
 > **🔒 Verbindungsdaten lokal:** Reale Werte für `<GAMEBOY_IP>`, `<GAMEBOY_SSH>`, `<COOLIFY_URL>`, `<WATCHDOG_*>` stehen in der **gitignored** Datei `gameboy-gate/gameboy.local.md` (NICHT im public Repo). Vor jedem Gate-Lauf diese Datei lesen und die Platzhalter ersetzen.
 
+> 🛡️ **Token-Discipline:** Dieser Gate ist bewusst **deterministisches Bash** (G0–G8) — er braucht **keinen** Multi-Agenten-Fächer. Auch in einer `ultracode`-Session die Phasen sequenziell/inline abarbeiten, **nicht** in Dutzende Subagenten/Workflows aufblähen (genau das war der historische Token-Burn). Globaler Default: `~/.claude/skills/token-discipline/token-router.md`.
+
 ## KONTEXT: Der Gameboy
 
 ```

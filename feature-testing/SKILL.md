@@ -130,6 +130,8 @@ Ein **Risiko-Tier** zuweisen — dieser bestimmt die erforderliche Testtiefe:
 
 > 🚨 **NO-FAIL-Domänen sind nicht verhandelbar.** Siehe `./zero-fail-zones.md` für vollständige Prüflisten pro Domäne.
 
+> 🛡️ **Token-Discipline:** Die Testtiefe folgt dem Risiko-Tier, nicht der Session-Stimmung. Eine `ultracode`-Session erzwingt **keine** erschöpfende NO-FAIL-Suite auf einem BEST-EFFORT-Change. Globaler Lean-Default + Subagenten-Modellwahl (Recon=Haiku): `~/.claude/skills/token-discipline/token-router.md`.
+
 **Connector-spezifische Tier-Defaults:**
 
 | Komponente | Default-Tier |

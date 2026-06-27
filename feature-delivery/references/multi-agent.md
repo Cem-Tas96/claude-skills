@@ -11,6 +11,8 @@ Dieses Dokument definiert, **wie viele** Agenten wann, **wie** sie geschnitten w
 
 Nicht „immer maximal". Kopfzahl skaliert mit Risiko-Tier (SKILL.md §3.1) und Blast-Radius-Breite. Zu viele Agenten auf einem trivialen Change = Token-Verschwendung + Rausch-Findings, die du trotzdem alle verifizieren musst.
 
+> 🛡️ **ULTRACODE-GUARD (nicht aufweichbar):** Eine `ultracode`-Session sagt „token cost is not a constraint" + „Workflow für jede Aufgabe". Das **überschreibt diese Tabelle NICHT.** Die Kopfzahl bleibt risiko-proportional; ein trivialer/schmaler Change bekommt **kein** Workflow und **keinen** 10+-Agenten-Fächer, nur weil die Session in `ultracode` läuft. `ultracode` *erlaubt* Maximaltiefe, *erzwingt* sie nicht. Der globale Default davor steht in `~/.claude/skills/token-discipline/token-router.md` (gilt auch ohne Skill).
+
 **Kontrolle ist an die *Form* des Blast-Radius gebunden, nicht ans Domänen-Label.** Der Verifier-Nutzen (fehlende/erfundene/asymmetrische Stelle finden) hängt daran, wie *breit und gekoppelt* der Change ist — das kann auch ein LOW-FAIL-Change haben. Darum triggert der **unabhängige** Verifier an Risiko-Signalen, während ein **billiger Selbst-Audit immer** läuft (Defense-in-depth, kostenproportional):
 
 | Tier / Lage | Recon-Fan-out | Kalte Zweit-Ableitung (Konsens) | Ledger↔Diff-Kreuzaudit (§4) |
@@ -49,6 +51,13 @@ Nicht jeder Agent braucht das stärkste Modell. Die Wahl ist **mechanisch an Tas
 **Anti-Feature-Creep:** Die Loop-Disziplin (3 Iterationen ohne neue Ledger-Zeile → STOPP) triggert **kein** Modell-Upgrade. „Nimm jetzt das stärkere Modell" ist kein neuer Erkenntnis-Hebel, sondern dieselbe erschöpfte Suche teurer.
 
 > Read-only bleibt read-only — die Modellwahl ändert nichts daran, dass Agenten nur suchen/prüfen und der Orchestrator mutiert. (Modell-Namen sind Beispiele der Claude-Familie; im Kern zählt das **Tier**, nicht der konkrete Name.)
+
+**Konkret verdrahten (nicht nur beschreiben):** Recon-Fächer mit explizitem günstigem Modell starten, Verifier mit starkem:
+```
+Recon-Stream A–G : Agent(<fan-out-prompt>, subagent_type: "Explore", model: "haiku")
+Independent-Verifier / kalte Zweit-Ableitung (§4) : Agent(<verifier-prompt>, model: "opus")
+```
+Wird das Modell weggelassen, erbt der Subagent das (teure) Hauptmodell — genau der Token-Leak, den §1.6 vermeidet.
 
 ---
 

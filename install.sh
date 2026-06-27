@@ -133,6 +133,40 @@ PY
   ok "SessionStart auto-pull hook in $SETTINGS"
 fi
 
+# 2b. Token-Discipline: effortLevel default + self-healing context hook (idempotent)
+#     Holt den ultracode-„token cost is not a constraint"-Default auf risiko-proportional zurueck.
+if command -v python3 >/dev/null 2>&1; then
+  [ -f "$SETTINGS" ] || echo "{}" > "$SETTINGS"
+  python3 - "$SETTINGS" <<'PY'
+import json, sys
+path = sys.argv[1]
+with open(path) as f:
+    cfg = json.load(f)
+changed = False
+# Effort-Default xhigh — nur setzen wenn der User keine bewusste Wahl hat (nie ueberschreiben)
+if "effortLevel" not in cfg:
+    cfg["effortLevel"] = "xhigh"
+    changed = True
+# Zweiter SessionStart-Eintrag: stellt den Triage-Block in CLAUDE.md sicher (laesst den git-pull unangetastet)
+cfg.setdefault("hooks", {}).setdefault("SessionStart", [])
+ctx_cmd = 'sh "$HOME/.claude/skills/hooks/ensure-context.sh" 2>/dev/null || true'
+have = any("ensure-context.sh" in h.get("command", "")
+           for entry in cfg["hooks"]["SessionStart"] for h in entry.get("hooks", []))
+if not have:
+    cfg["hooks"]["SessionStart"].append({"hooks": [{"type": "command", "command": ctx_cmd}]})
+    changed = True
+if changed:
+    with open(path, "w") as f:
+        json.dump(cfg, f, indent=2); f.write("\n")
+print("td-updated" if changed else "td-exists")
+PY
+  # Jetzt einmalig anwenden (Block in CLAUDE.md schreiben), fail-safe
+  sh "$SKILLS_DIR/hooks/ensure-context.sh" 2>/dev/null || true
+  ok "Token-Discipline aktiv (effortLevel xhigh-Default + Triage-Context-Hook)"
+else
+  warn "python3 fehlt — Token-Discipline-Settings uebersprungen (Block via Hook beim naechsten Start)."
+fi
+
 # 3. Patch ~/.claude/CLAUDE.md — add natural-language trigger (idempotent)
 MARKER="<!-- claude-skills-sync:do-not-remove -->"
 if [ -f "$CLAUDE_MD" ] && grep -qF "$MARKER" "$CLAUDE_MD"; then
