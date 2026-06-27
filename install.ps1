@@ -61,6 +61,31 @@ if (Test-Path (Join-Path $SkillsDir ".git")) {
 }
 OK "Skills at $SkillsDir"
 
+# 1b. Global secret-scanning pre-commit hook — blocks credentials/keys in ANY repo
+$HooksDir = Join-Path $SkillsDir "hooks"
+if (Test-Path (Join-Path $HooksDir "pre-commit")) {
+  $HooksPathCfg = ($HooksDir -replace '\\','/')
+  $cur = (& git config --global --get core.hooksPath) 2>$null
+  if ([string]::IsNullOrWhiteSpace($cur) -or $cur -eq $HooksPathCfg) {
+    & git config --global core.hooksPath $HooksPathCfg
+    OK "Secret-Guard aktiv (global core.hooksPath -> $HooksPathCfg)"
+  } else {
+    Warn "core.hooksPath bereits gesetzt ($cur) — nicht ueberschrieben. Manuell: git config --global core.hooksPath `"$HooksPathCfg`""
+  }
+  $DenyDir = Join-Path $env:USERPROFILE ".config\git"
+  $Deny    = Join-Path $DenyDir "secret-denylist.local.txt"
+  if (-not (Test-Path $Deny)) {
+    New-Item -ItemType Directory -Force -Path $DenyDir | Out-Null
+    @(
+      "# Persoenliche Secret-Denylist — literal-Strings die NIE in einen Commit duerfen.",
+      "# Eine pro Zeile, # = Kommentar. Wird vom globalen pre-commit-Hook gelesen. Lokal, nie eingecheckt."
+    ) | Set-Content -Encoding UTF8 $Deny
+    OK "Denylist-Template angelegt: $Deny"
+  }
+} else {
+  Warn "hooks/pre-commit noch nicht im Repo — Secret-Guard nach naechstem Pull aktiv."
+}
+
 # 2. Patch settings.json — add SessionStart auto-pull hook (idempotent)
 if (-not (Test-Path $Settings)) { '{}' | Set-Content -Encoding UTF8 $Settings }
 

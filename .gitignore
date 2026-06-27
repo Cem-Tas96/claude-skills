@@ -12,3 +12,5 @@ node_modules/
 .env
 .env.*
 gameboy-gate/gameboy.local.md
+secret-denylist.local.txt
+*secret-denylist*

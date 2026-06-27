@@ -79,6 +79,30 @@ else
 fi
 ok "Skills at $SKILLS_DIR"
 
+# 1b. Global secret-scanning pre-commit hook — blocks credentials/keys in ANY repo
+HOOKS_DIR="$SKILLS_DIR/hooks"
+if [ -f "$HOOKS_DIR/pre-commit" ]; then
+  chmod +x "$HOOKS_DIR/pre-commit" 2>/dev/null || true
+  cur="$(git config --global --get core.hooksPath || true)"
+  if [ -z "$cur" ] || [ "$cur" = "$HOOKS_DIR" ]; then
+    git config --global core.hooksPath "$HOOKS_DIR"
+    ok "Secret-Guard aktiv (global core.hooksPath -> $HOOKS_DIR)"
+  else
+    warn "core.hooksPath bereits gesetzt ($cur) — nicht überschrieben. Manuell: git config --global core.hooksPath \"$HOOKS_DIR\""
+  fi
+  DENY_DIR="$HOME/.config/git"; DENY="$DENY_DIR/secret-denylist.local.txt"
+  if [ ! -f "$DENY" ]; then
+    mkdir -p "$DENY_DIR"
+    cat > "$DENY" <<'EOF'
+# Persönliche Secret-Denylist — literal-Strings die NIE in einen Commit dürfen.
+# Eine pro Zeile, # = Kommentar. Wird vom globalen pre-commit-Hook gelesen. Lokal, nie eingecheckt.
+EOF
+    ok "Denylist-Template angelegt: $DENY"
+  fi
+else
+  warn "hooks/pre-commit noch nicht im Repo — Secret-Guard nach nächstem Pull aktiv."
+fi
+
 # 2. Patch settings.json — add SessionStart auto-pull hook (idempotent)
 if ! command -v python3 >/dev/null 2>&1; then
   warn "python3 not found — skipping settings.json patch."
