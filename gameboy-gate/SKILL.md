@@ -239,9 +239,9 @@ Drei Schichten, **alle Pflicht**:
        restart: unless-stopped
        oom_score_adj: -900        # globaler OOM-Killer waehlt NIE den Proxy
        environment:
-         - GOMEMLIMIT=300MiB       # Go GCt aggressiv statt auf ~1GB zu wachsen
-       mem_limit: 384m             # Backstop > GOMEMLIMIT; leakt es doch -> Container-Restart (unless-stopped), nicht Box-OOM
-       mem_reservation: 128m
+         - GOMEMLIMIT=200MiB       # Go GCt aggressiv -> traefik bleibt ~40-200MB statt auf ~1GB zu wachsen
+       mem_limit: 512m             # MUSS ~2x GOMEMLIMIT sein, sonst killt das EIGENE cgroup-Limit traefik (s.u. 🚨)
+       mem_reservation: 192m
    ```
 
 2. **systemd-Guard** (re-applied jede Minute → überlebt Proxy-Restart UND Coolify-Regenerierung, die die compose-Datei überschreiben kann):
@@ -258,7 +258,9 @@ Drei Schichten, **alle Pflicht**:
    ```
    `oom_score_adj >= 0` ODER fehlendes `GOMEMLIMIT` ODER Guard-Timer inaktiv → **GATE FAIL**.
 
-> **Warum nicht einfach das Proxy-Limit erhöhen?** Das verschiebt den Crash nur. `GOMEMLIMIT` verhindert das *Wachstum*, `oom_score_adj<0` nimmt den Proxy aus der OOM-Schusslinie. Beides zusammen = der Proxy stirbt nicht mehr. **Bewiesen 28.06.2026:** unter `ab -c 50` blieb traefik bei ~41 MB (vorher 980 MB), 0 OOM, restarts=0.
+> 🚨 **`oom_score_adj` schützt NICHT gegen das eigene cgroup-Limit.** Trifft traefik sein *eigenes* `mem_limit`, feuert „Memory cgroup out of memory" und killt traefik — `oom_score_adj` zählt nur beim *globalen/Host*-OOM. **Real passiert (28.06.2026, beim Deploy-Stresstest):** mit `GOMEMLIMIT=300MiB` + `mem_limit=384m` (zu eng!) wuchs traefik unter Build-Druck auf ~350 MB und wurde **2× cgroup-OOM-gekillt trotz `oom_score_adj=-900`** (Seite überlebte dank Sofort-Restart, nur 1 ping-fail — aber vermeidbar). **Lehre: `GOMEMLIMIT` ≈ 0,4 × `mem_limit`** (Headroom für Go-Off-Heap/Stacks), nicht knapp drunter → darum 200MiB / 512m.
+
+> **Warum nicht einfach das Proxy-Limit hochsetzen ohne GOMEMLIMIT?** Dann wächst der Go-Heap ungebremst bis ~1GB (das Original-Problem). Es braucht BEIDE: `GOMEMLIMIT` bremst das Wachstum, `mem_limit` (mit Headroom) ist der Backstop, `oom_score_adj` hält den globalen OOM fern. **Bewiesen 28.06.2026:** unter `ab -c 50` blieb traefik bei ~41 MB (vorher 980 MB).
 
 ### Phase G3: Environment-Variablen setzen
 
@@ -275,6 +277,12 @@ UV_THREADPOOL_SIZE=<UV_THREADPOOL_SIZE>
 AP_MAX_CONCURRENT_JOBS=2      # niedrig halten: jeder unsandboxed Flow-Step ~200MB -> 5 concurrent = OOM (war 5)
 AP_TRIGGER_DEFAULT_POLL_INTERVAL=30  # reduziert DB- UND CPU-Baseline-Last; auf 2-vCPU eher 30 als 15 (war 15)
 NODE_OPTIONS=--max-old-space-size=768  # ueberschreibt Dockerfile-Default 1024; Headroom fuer V8 GC + Sandbox-Worker (war 1024 -> OOM)
+# 🚨 BUILD vs RUNTIME HEAP (realer Deploy-Killer 28.06.2026): Coolify reicht NODE_OPTIONS AUCH als Build-Arg
+#    durch. 768 ist fuer die RUNTIME korrekt, aber viel zu klein um das web-Frontend zu BAUEN
+#    -> "JavaScript heap out of memory" (exit 137), Deploy scheitert STILL (seit 27.06-Commit kein Deploy mehr durch).
+#    Fix im Dockerfile: Build-RUN entkoppeln mit eigenem hohen Heap, Run-Stage behaelt 768:
+#      RUN NODE_OPTIONS=--max-old-space-size=3072 npx turbo run build --filter=web ...
+#    (physisch swap-gedeckt; Cap verhindert nur den vorzeitigen V8-Abort, Verbrauch = echter Bedarf ~2GB)
 
 # Für alle Apps:
 # (kein DEBUG logging in production!)
@@ -412,6 +420,24 @@ fi
 <GAMEBOY_SSH> "command -v python3 >/dev/null 2>&1 || echo 'MISSING-ON-GAMEBOY: python3 (G5 daemon.json-Update wird scheitern)'"
 ```
 
+### Phase G5.7: HOST-MEMORY-SYSCTLS (PFLICHT — sonst scheitern Deploys/Builds STILL)
+
+> **Realer Incident (28.06.2026):** Auf dem Gameboy war `vm.overcommit_memory=2` (strict, kein Overcommit) gesetzt. Folge: **jeder `docker compose build` starb in Sekunden mit `fatal error: runtime: cannot allocate memory`** — der Go-/BuildKit-Build wollte virtuellen Speicher, den der Strict-Mode bei `Committed_AS` (war 6,3GB) nahe `CommitLimit` (7,3GB) verweigert. Resultat: **tagelang kein erfolgreicher Deploy**, App lief still auf altem Stand weiter. Das ist **KEIN OOM** und in `free`/RAM-Anzeige unsichtbar — der Load-Test (G6) hätte es NIE gefunden, weil der Build nie startet.
+
+```bash
+<GAMEBOY_SSH> "
+echo 'overcommit:'; sysctl vm.overcommit_memory     # MUSS 0 oder 1 sein, NIE 2 (Docker/Go/Node/Redis-Host)
+echo 'swappiness:'; sysctl vm.swappiness            # SOLL >= 60 (RAM-knapp -> Swap statt OOM)
+swapon --show | grep -q . && echo 'swap OK' || echo 'KEIN SWAP'
+grep -E 'CommitLimit|Committed_AS' /proc/meminfo    # Committed_AS nahe CommitLimit + overcommit=2 = Build-ENOMEM
+"
+```
+- `vm.overcommit_memory == 2` → **GATE FAIL** (Builds scheitern garantiert). Fix: `sysctl -w vm.overcommit_memory=1` + persist in `/etc/sysctl.d/99-gameboy-mem.conf` (Redis empfiehlt `1`).
+- **Kein Swap** → FAIL (kein Puffer für Build-/Last-Spitzen).
+- `vm.swappiness < 60` → SOLL-Warnung (Kernel meidet Swap, OOM-killt früher).
+
+> **Bonus-Lehre (gleicher Incident):** 10 Pushes in 20s lösten 8 parallele Deploys derselben App aus → Coolify-**Race** (`docker exec` auf bereits entfernten Build-Container → `No such container`), ALLE failed → nichts deployed (App lief still auf altem Stand). Lehre: nicht rapid-fire pushen; nach mehreren Pushes prüfen, dass der LETZTE Deploy `finished` ist (`application_deployment_queues`), nicht nur „kein Crash".
+
 ### Phase G6: Load-Test (die eigentliche Aufnahmeprüfung)
 
 50 concurrent users, 60 Sekunden. Der Watchdog wird für das Testfenster pausiert (sonst killt seine Remediation evtl. mitten im Test den App-Container):
@@ -467,6 +493,8 @@ restore_watchdog
 | **Proxy OOM-immun** (G2.6) | `coolify-proxy` live `oom_score_adj < 0` UND `GOMEMLIMIT` gesetzt UND `mem_limit <= 384m` UND Guard-Timer active |
 | **Kein RAM-Overcommit** | Summe ALLER Container-Limits ≤ RAM + 0.5×Swap; kein Prod-Container mit Limit `0` (unlimited) |
 | Swappiness | `vm.swappiness >= 60` auf RAM-knappem Host (SOLL) |
+| **`vm.overcommit_memory != 2`** | bei `2` (strict) scheitert JEDER Docker/Go/Node-Build mit `cannot allocate memory` → Deploys tot (G5.7) |
+| **Letzter Deploy `finished`** | nach Push(es): jüngster Eintrag in `application_deployment_queues` ist `finished`, nicht `failed` (sonst läuft still die alte Version) |
 | Load avg (5m) nach Test | < 1.6 (2 vCPU = < 0.8/Core) |
 | Idle baseline (vor Last) | < 35%/Core busy — informativ, KEIN harter FAIL |
 | Running-Env == committed config | NODE_OPTIONS / AP_MAX_CONCURRENT_JOBS / POLL des laufenden Containers identisch zu G1/Repo (G3.5 PASS) |
@@ -481,6 +509,7 @@ restore_watchdog
 - Memory hat Limit erreicht (> 95%)
 - **Proxy `oom_score_adj >= 0` oder ohne `GOMEMLIMIT`** → der Keystone-Proxy ist OOM-killbar → BLOCKIERT (G2.6); ein Proxy-Tod nimmt ALLE Apps offline
 - **Summe aller Container-Limits > RAM + Swap** → garantierter OOM unter Last → BLOCKIERT (Budget falsch gezählt? jede Coolify-App = mehrere Container)
+- **`vm.overcommit_memory == 2`** → jeder Build stirbt mit `cannot allocate memory` (ENOMEM), kein Deploy kommt durch → BLOCKIERT (G5.7); unsichtbar im RAM/Load-Test
 - `Failed requests > 1%`
 - `p99 > 5000ms`
 - Watchdog hat während des Tests eingegriffen (prüfen: `<WATCHDOG_LOG>`)
