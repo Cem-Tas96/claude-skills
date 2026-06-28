@@ -51,6 +51,8 @@ FREI für Projekte:       ~2840MB  (3840 - 400 OS - 400 Coolify - 200 Safety; si
 - `app-landing` (Static): 256MB limit / 128MB reservation
 - **Belegt:** 2304MB limit / 1152MB reservation
 
+> 🚨 **ROOT-CAUSE eines realen False-PASS (28.06.2026):** Diese Zählung ist FALSCH und hat den Gate „PASS" sagen lassen, während der Server überbucht war. Jede Coolify-„application" fährt **mehrere** Container: eine Activepieces-Resource = **app + postgres + redis + postgres-backup** (≈ 1536+768+256+256 = **2816 MB allein für AP**). Dazu **coolify-proxy** (stand auf **1 GB**) + Coolify-Stack (~1 GB) + billing/landing inkl. deren DB/Redis. Real committed war **~6,2 GB auf 3,8 GB RAM** → garantierter OOM (traefik wurde 5+ mal gekillt). **`RUNNING_PROJECTS_MB` MUSS ALLE laufenden Container summieren** (`docker ps` → je `HostConfig.Memory`, `0` = unlimited = eigener FAIL, siehe G7), **nicht nur die Top-App.**
+
 ---
 
 ## GATE-ABLAUF (in dieser Reihenfolge, kein Überspringen)
@@ -223,6 +225,40 @@ SELECT uuid, name, limits_memory, limits_cpus FROM applications WHERE uuid='$APP
 \"
 "
 ```
+
+### Phase G2.6: PROXY-SCHUTZ — traefik OOM-immun machen (PFLICHT — der Keystone)
+
+> **Root-Cause des realen Ausfalls (28.06.2026):** Nach „PASS" killte der OOM-Killer **`coolify-proxy` (traefik)** wiederholt, jedes Mal bei ~940–980 MB. Ursachen: (1) traefik v3.x **ohne `GOMEMLIMIT`** → Go-Heap wächst ungebremst, (2) Proxy-Limit 1 GB ließ es bis 1 GB ballonnen, (3) `oom_score_adj=0` machte den Proxy zum normalen OOM-Opfer. **Stirbt der Proxy → ALLE Apps offline.** Der Gate hatte keine Phase, die den Keystone schützt. Das ist sie.
+
+Drei Schichten, **alle Pflicht**:
+
+1. **In `/data/coolify/proxy/docker-compose.yml`** (Backup → editieren → `docker compose config` validieren → `up -d`, kurzer Blip):
+   ```yaml
+   services:
+     traefik:
+       restart: unless-stopped
+       oom_score_adj: -900        # globaler OOM-Killer waehlt NIE den Proxy
+       environment:
+         - GOMEMLIMIT=300MiB       # Go GCt aggressiv statt auf ~1GB zu wachsen
+       mem_limit: 384m             # Backstop > GOMEMLIMIT; leakt es doch -> Container-Restart (unless-stopped), nicht Box-OOM
+       mem_reservation: 128m
+   ```
+
+2. **systemd-Guard** (re-applied jede Minute → überlebt Proxy-Restart UND Coolify-Regenerierung, die die compose-Datei überschreiben kann):
+   - `/usr/local/bin/gameboy-proxy-guard.sh`: `for pid in $(pgrep -x traefik); do echo -900 > /proc/$pid/oom_score_adj; done`
+   - `gameboy-proxy-guard.service` (Type=oneshot) + `.timer` (`OnUnitActiveSec=60`) → `systemctl enable --now gameboy-proxy-guard.timer`
+
+3. **Verifikation (read-only) — FAIL wenn nicht erfüllt:**
+   ```bash
+   P=$(docker inspect -f '{{.State.Pid}}' coolify-proxy)
+   cat /proc/$P/oom_score_adj                         # MUSS < 0 sein (Ziel -900)
+   docker exec coolify-proxy printenv GOMEMLIMIT      # MUSS gesetzt sein
+   docker inspect -f '{{.HostConfig.Memory}}' coolify-proxy   # <= 402653184 (384m)
+   systemctl is-active gameboy-proxy-guard.timer      # MUSS active sein
+   ```
+   `oom_score_adj >= 0` ODER fehlendes `GOMEMLIMIT` ODER Guard-Timer inaktiv → **GATE FAIL**.
+
+> **Warum nicht einfach das Proxy-Limit erhöhen?** Das verschiebt den Crash nur. `GOMEMLIMIT` verhindert das *Wachstum*, `oom_score_adj<0` nimmt den Proxy aus der OOM-Schusslinie. Beides zusammen = der Proxy stirbt nicht mehr. **Bewiesen 28.06.2026:** unter `ab -c 50` blieb traefik bei ~41 MB (vorher 980 MB), 0 OOM, restarts=0.
 
 ### Phase G3: Environment-Variablen setzen
 
@@ -428,6 +464,9 @@ restore_watchdog
 | Keine Failed-Requests | < 0.1% |
 | Server nach Test erreichbar | HTTP 200/302 auf allen URLs |
 | CPU nach Test | < 80% sustained |
+| **Proxy OOM-immun** (G2.6) | `coolify-proxy` live `oom_score_adj < 0` UND `GOMEMLIMIT` gesetzt UND `mem_limit <= 384m` UND Guard-Timer active |
+| **Kein RAM-Overcommit** | Summe ALLER Container-Limits ≤ RAM + 0.5×Swap; kein Prod-Container mit Limit `0` (unlimited) |
+| Swappiness | `vm.swappiness >= 60` auf RAM-knappem Host (SOLL) |
 | Load avg (5m) nach Test | < 1.6 (2 vCPU = < 0.8/Core) |
 | Idle baseline (vor Last) | < 35%/Core busy — informativ, KEIN harter FAIL |
 | Running-Env == committed config | NODE_OPTIONS / AP_MAX_CONCURRENT_JOBS / POLL des laufenden Containers identisch zu G1/Repo (G3.5 PASS) |
@@ -440,6 +479,8 @@ restore_watchdog
 **FAIL** (einer reicht für BLOCKIERT):
 - Irgendein Container ist nach dem Test down/restarted
 - Memory hat Limit erreicht (> 95%)
+- **Proxy `oom_score_adj >= 0` oder ohne `GOMEMLIMIT`** → der Keystone-Proxy ist OOM-killbar → BLOCKIERT (G2.6); ein Proxy-Tod nimmt ALLE Apps offline
+- **Summe aller Container-Limits > RAM + Swap** → garantierter OOM unter Last → BLOCKIERT (Budget falsch gezählt? jede Coolify-App = mehrere Container)
 - `Failed requests > 1%`
 - `p99 > 5000ms`
 - Watchdog hat während des Tests eingegriffen (prüfen: `<WATCHDOG_LOG>`)
@@ -674,6 +715,8 @@ Der Memory-Watchdog läuft alle 2 Minuten und schützt den Server (reale Pfade s
 Falls der Watchdog während des Gate-Tests eingreift → **FAIL** (kein PASS mit Watchdog-Intervention). Deshalb pausiert G6 den Timer für das Testfenster (mit garantiertem Restore).
 
 ### ⚠️ Remediation-Audit: Die "Heilung" des Watchdogs ist destruktiv
+
+> ✅ **FIXED (28.06.2026):** Die Remediation wurde non-destruktiv neu geschrieben. Neue Logik: Trigger < 300 MB → **(1)** `sync; echo 1 > drop_caches` (non-destruktiv), erholt sich der RAM → fertig; **(2)** nur ein **Wegwerf-Container** aus expliziter Allowlist (`postgres-backup`) wird notfalls neugestartet; **(3)** `coolify-proxy` und alle öffentlichen App-Container (Projekt-Präfix, siehe `PROTECT`-Regex im Script) sowie der Coolify-Stack stehen auf einer **PROTECT-Liste und werden NIE neugestartet**. Backup der alten Version liegt als `<WATCHDOG_SCRIPT>.bak.*` (realer Pfad siehe `gameboy.local.md`). Der folgende Abschnitt beschreibt den vorherigen (destruktiven) Stand als Audit-Referenz.
 
 Der Watchdog ist KEIN passiver Sensor. Seine aktuelle Remediation (Stand 27.06.2026) ist:
 `docker restart` des **größten Speicherverbrauchers** (sortiert nach `MemPerc`). Auf dem
