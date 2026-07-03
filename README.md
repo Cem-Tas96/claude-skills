@@ -4,6 +4,39 @@ Personal skills for Claude Code, synced across all my machines (macOS + Windows)
 
 Lives at `~/.claude/skills/` so every Claude Code session in every project picks them up automatically.
 
+**Zwei Wege, die Skills zu nutzen — beide bleiben dauerhaft unterstützt:**
+
+| Weg | Für wen | Mechanik |
+|---|---|---|
+| **A: Repo-Clone** (unten) | Cem / eigene Geräte (VSCode, Terminal) | Clone als `~/.claude/skills/`, Auto-Pull via SessionStart-Hook, inkl. Secret-Guard + Token-Discipline-Setup |
+| **B: Plugin-Marketplace** ([Abschnitt](#nutzung-als-plugin-marketplace--claude-code-web--ohne-clone)) | Kollegen/Boss, Claude Code Web | `/plugin marketplace add Cem-Tas96/claude-skills`, kein Git-Setup nötig |
+
+## Nutzung als Plugin-Marketplace — Claude Code Web / ohne Clone
+
+Das Repo ist gleichzeitig ein **Claude Code Plugin-Marketplace** (`.claude-plugin/marketplace.json`). Funktioniert überall wo Plugins unterstützt werden: CLI, Desktop, VS Code-Extension und **Claude Code Web** (claude.ai/code).
+
+**Installieren (einmalig)** — in Claude Code eingeben:
+
+```
+/plugin marketplace add Cem-Tas96/claude-skills
+/plugin install feature-delivery@claude-skills
+/plugin install feature-testing@claude-skills
+```
+
+(`feature-testing` mitinstallieren — `feature-delivery` orchestriert es in der Verifikationsphase. Optional: `/plugin install gameboy-gate@claude-skills`.)
+
+Alternativ im Terminal: `claude plugin marketplace add Cem-Tas96/claude-skills` und `claude plugin install feature-delivery@claude-skills`.
+
+**Aktualisieren** (neueste Skill-Versionen holen):
+
+```
+/plugin marketplace update claude-skills
+```
+
+**Entfernen:** `/plugin uninstall feature-delivery@claude-skills` bzw. `/plugin marketplace remove claude-skills`.
+
+> Hinweis für Plugin-Nutzer: Die Skills funktionieren standalone. Cems zusätzliche Clone-Extras (globaler Secret-Guard-Hook, Token-Discipline-Kontext in `~/.claude/CLAUDE.md`) sind Teil des Installer-Wegs A und für die Skill-Nutzung nicht erforderlich — die relevanten Defaults stecken in den Skills selbst.
+
 ## Install / update on a new machine — one command
 
 > **Public repo** — kein Login/Token nötig. Der Installer installiert `git` automatisch (winget/brew/apt/dnf/pacman/apk), falls es fehlt.

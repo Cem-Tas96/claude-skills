@@ -1,0 +1,24 @@
+{
+  "name": "claude-skills",
+  "owner": {
+    "name": "Cem-Tas96"
+  },
+  "description": "Enterprise-Skills von Cem: feature-delivery (Loop-Engine-Implementierungs-Disziplin), feature-testing (Testautomatisierung), gameboy-gate (Deploy-Aufnahmepruefung). Installation: /plugin install feature-delivery@claude-skills",
+  "plugins": [
+    {
+      "name": "feature-delivery",
+      "source": "./feature-delivery",
+      "description": "Enterprise-Implementierungs-Disziplin als autonome Loop-Engine: Blast-Radius kartieren, State-Table modellieren, symmetrisch implementieren, mit unabhaengigen Subagenten verifizieren (Writer != Reviewer), bis die Definition-of-Done wirklich erfuellt ist. Orchestriert /feature-testing, /verify und /security-review. Empfohlen: feature-testing mitinstallieren."
+    },
+    {
+      "name": "feature-testing",
+      "source": "./feature-testing",
+      "description": "Enterprise-Testautomatisierung fuer jedes neue Feature: Aenderungsanalyse, Teststrategie, Implementierung, Auto-Fix-Loop, Quality Gates, Freigabe. Wird von feature-delivery in der Verifikationsphase orchestriert."
+    },
+    {
+      "name": "gameboy-gate",
+      "source": "./gameboy-gate",
+      "description": "Aufnahmepruefung fuer Deployments auf dem Gameboy-Server (Hetzner CAX11, 4GB RAM): berechnet Limits dynamisch, konfiguriert Coolify persistent, testet unter Last, gibt PASS/FAIL. Server-Verbindungsdaten liegen lokal (gameboy.local.md), nicht im Plugin."
+    }
+  ]
+}
