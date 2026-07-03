@@ -43,21 +43,29 @@ Nicht jeder Agent braucht das stärkste Modell. Die Wahl ist **mechanisch an Tas
 | Task-Klasse | Modell-Tier | Warum |
 |---|---|---|
 | Breiten-Recon (Streams A–G) · Symbol-Suche · mechanische Scans (WIP/Brand-Grep) | **günstig/schnell** (z.B. Haiku) | Recall zählt, nicht Präzision — jede gemeldete Stelle wird ohnehin im Source-Abgleich (§3 Gate 2) gegengelesen; Halluzinationen fallen dort raus. Die Gate-Kosten sind fix, unabhängig vom Recon-Modell. |
-| Independent-Verifier (§4) · kalte Zweit-Ableitung (Konsens) · Spec-Compliance bei NO-FAIL | **stärkstes** (z.B. Opus) | Bewertung *unter Unsicherheit* — Lücken *zwischen* Ledger-Zeilen erkennen, Asymmetrie beurteilen, fremde Funde ohne deren Sicht prüfen. Ein Verifier-Fehler sperrt den Liefer-Kurs (offener Kreuzaudit-Befund = BLOCKIERT). |
+| Independent-Verifier (§4) · kalte Zweit-Ableitung (Konsens) · Spec-Compliance bei NO-FAIL | **stärkstes verfügbares Tier** — per **Vererbung des Hauptmodells** (kein `model`-Parameter; aktuell z.B. Fable 5, Fallback Opus) | Bewertung *unter Unsicherheit* — Lücken *zwischen* Ledger-Zeilen erkennen, Asymmetrie beurteilen, fremde Funde ohne deren Sicht prüfen. Ein Verifier-Fehler sperrt den Liefer-Kurs (offener Kreuzaudit-Befund = BLOCKIERT). |
 | Code-Quality-Review (Idiomatik, lokal) | **mittel** reicht | Idiom ist lokal am Umfeld prüfbar; Source-Abgleich fängt Fehlurteile. |
 
 **Warum nicht das stärkste Modell für alles?** Token-Waste: günstiges Modell + fixes Source-Gate liefert dasselbe Recon-Ergebnis (jede Stelle wird gelesen), nur billiger. Das starke Modell erspart **nicht** die Gate-2-Arbeit, es verdoppelt nur die Recon-Kosten.
 
-**Anti-Feature-Creep:** Die Loop-Disziplin (3 Iterationen ohne neue Ledger-Zeile → STOPP) triggert **kein** Modell-Upgrade. „Nimm jetzt das stärkere Modell" ist kein neuer Erkenntnis-Hebel, sondern dieselbe erschöpfte Suche teurer.
+**Anti-Feature-Creep:** Die Loop-Disziplin (3 Iterationen ohne neue Ledger-Zeile → STOPP) triggert **kein** Modell-Upgrade — **auch kein Fable-/Top-Tier-Upgrade**. „Nimm jetzt das stärkere Modell" ist kein neuer Erkenntnis-Hebel, sondern dieselbe erschöpfte Suche teurer.
 
 > Read-only bleibt read-only — die Modellwahl ändert nichts daran, dass Agenten nur suchen/prüfen und der Orchestrator mutiert. (Modell-Namen sind Beispiele der Claude-Familie; im Kern zählt das **Tier**, nicht der konkrete Name.)
 
-**Konkret verdrahten (nicht nur beschreiben):** Recon-Fächer mit explizitem günstigem Modell starten, Verifier mit starkem:
+**Konkret verdrahten (nicht nur beschreiben):** Recon-Fächer mit explizitem günstigem Modell + niedrigem Effort starten; Verifier **ohne** `model`-Parameter (erbt das Hauptmodell = stärkstes Tier) mit hohem Effort:
 ```
-Recon-Stream A–G : Agent(<fan-out-prompt>, subagent_type: "Explore", model: "haiku")
-Independent-Verifier / kalte Zweit-Ableitung (§4) : Agent(<verifier-prompt>, model: "opus")
+Recon-Stream A–G : Agent(<fan-out-prompt>, subagent_type: "Explore", model: "haiku", effort: "low")
+Independent-Verifier / kalte Zweit-Ableitung (§4) : Agent(<verifier-prompt>, effort: "xhigh")   ← KEIN model-Parameter
 ```
-Wird das Modell weggelassen, erbt der Subagent das (teure) Hauptmodell — genau der Token-Leak, den §1.6 vermeidet.
+
+**🔒 Zukunftssicherheits-Regel (Top-Tier NIE per Namen pinnen):** Das stärkste Modell wird **nicht** hart als `model: "opus"`/`"fable"` verdrahtet, sondern über **Weglassen des `model`-Parameters** bezogen — der Subagent erbt dann das Hauptmodell der Session. Erscheint morgen ein neues Top-Modell (Fable 6 oder ein noch unbekannter Name), zieht der Skill automatisch mit, sobald die Session darauf läuft — ohne Skill-Änderung. Ein hart codierter Name wäre ab dem ersten Modell-Release veraltet.
+
+**Die Vererbungs-Regel dreht sich je Rolle um:**
+- **Recon / mechanische Scans / Impl-Helfer:** Weglassen des Modells ist der **Token-Leak** (erbt das teure Hauptmodell) → **immer** explizit `model: "haiku"` (Recon) bzw. `model: "sonnet"` (Impl-Helfer) setzen.
+- **Verifier / kalte Zweit-Ableitung / NO-FAIL-Synthese:** Weglassen ist das **Feature** (erbt automatisch das stärkste Tier).
+- **Ausnahme:** Läuft die Session bewusst auf einem schwächeren Hauptmodell (z.B. `/model sonnet` für Routine-Ops), erbt der Verifier zu schwach → dann explizit das stärkste **bekannte** Modell pinnen (aktuell `model: "fable"`, falls nicht verfügbar `"opus"`). Nur in diesem Fall darf ein Name in den Call.
+
+**Effort als zweiter Hebel (Qualitäts-Boden unangetastet):** Recon `effort: "low"` (Recall-Arbeit, Gate 2 fängt alles), Verifier `effort: "xhigh"` (Bewertung unter Unsicherheit). Das spart auf der billigen Seite zusätzlich, ohne die Gates zu berühren.
 
 ---
 

@@ -132,7 +132,7 @@ Die Schleife hat **eine** Erfolgs-Endbedingung und **drei** Stop-Garantien — a
 - eine **Spec-Quelle/Connector** (P1.8, §8) statt halluzinierter Text,
 - eine **menschliche Entscheidung** (→ NEEDS_CONTEXT),
 - oder das Ziel ist außerhalb der erreichbaren Coverage (→ ehrlich DONE_WITH_CONCERNS/BLOCKIERT mit Grund).
-> Loop-Disziplin triggert **kein** Modell-Upgrade und keine höhere Agenten-Kopfzahl — dieselbe erschöpfte Suche teurer ist kein neuer Erkenntnis-Hebel (`multi-agent.md` §1.6).
+> Loop-Disziplin triggert **kein** Modell-Upgrade — **auch kein Fable-/Top-Tier-Upgrade** — und keine höhere Agenten-Kopfzahl; dieselbe erschöpfte Suche teurer ist kein neuer Erkenntnis-Hebel (`multi-agent.md` §1.6).
 
 **STOP-2 — NEEDS_CONTEXT:** hängt an einer Entscheidung/Information, nicht an Code (Boss-OK · Spec-Klärung · fehlender Zugang). Die **eine** gebündelte Frage an den Owner, Checkpoint pausiert, kein Merge.
 

@@ -32,14 +32,15 @@ Vor jeder substanziellen Antwort zuerst still einschaetzen ("Triage"). Volldetai
 
 - **T0 Trivial** (Frage/Lookup/Mini-Edit/Status) → 0 Subagenten, inline.
 - **T1 Standard** (Fix/Feature, schmaler Blast-Radius) → inline; Faecher nur wenn Blast-Radius real breit.
-- **T2 Komplex/NO-FAIL** (Auth/Payment/Rollen/PII/Migration/cross-layer/multi-repo) → risiko-proportionaler Faecher; Subagenten-Modelle: Recon=Haiku, Impl=Sonnet, Verifier/Synthese=Opus.
+- **T2 Komplex/NO-FAIL** (Auth/Payment/Rollen/PII/Migration/cross-layer/multi-repo) → risiko-proportionaler Faecher; Subagenten-Modelle: Recon=Haiku (explizit), Impl=Sonnet (explizit), Verifier/Synthese=**Top-Tier per Vererbung** (KEIN model-Parameter → erbt Hauptmodell; aktuell Fable 5, Fallback Opus).
 - **T3** = NUR wenn der User explizit eskaliert (tippt `ultracode` / "nutze einen Workflow" / "sei erschoepfend").
 
 Regeln:
 - **`ultracode`/Workflows sind opt-in.** NIE automatisch einen Workflow oder 10+-Agenten-Faecher fuer T0/T1 starten. Auch in einer ultracode-Session: kein Workflow fuer triviale Arbeit.
-- **Hauptmodell bleibt wie gewaehlt (Default Opus).** Gespart wird ueber Subagenten-Modelle (Haiku-Recon) und wenige Agenten — nicht ueber das Hauptmodell. Effort-Default `xhigh` (nicht `max`/`ultracode`).
+- **Hauptmodell bleibt wie gewaehlt (Default: staerkstes verfuegbares Modell, aktuell Fable 5).** Gespart wird ueber Subagenten-Modelle (Haiku-Recon) und wenige Agenten — nicht ueber das Hauptmodell. Effort-Default `xhigh` (nicht `max`/`ultracode`).
+- **Zukunftssicherheit:** Top-Tier NIE per Namen pinnen — Verifier/Synthese erben das Hauptmodell (model-Parameter weglassen); neues Top-Modell zieht automatisch mit. Top-Tier NIE fuer Recon/Scans/Impl-Helfer (Anti-Waste).
 - **Qualitaets-Boden nie kuerzen:** Anti-Halluzination (Citation + Source-Read), Writer≠Reviewer, STOP bei 3x kein Wachstum. Mehr Agenten kaufen Recall, nicht Praezision.
-- **Transparenz:** bei T2/T3 eine Zeile vorab — `Triage: <Tier> · <n> Recon (Haiku) · Verifier (Opus) · Grund: …`.
+- **Transparenz:** bei T2/T3 eine Zeile vorab — `Triage: <Tier> · <n> Recon (Haiku) · Verifier (Top-Tier/erbt Hauptmodell) · Grund: …`.
 EOF
 
 exit 0
