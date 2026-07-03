@@ -9,11 +9,13 @@ Lives at `~/.claude/skills/` so every Claude Code session in every project picks
 | Weg | Für wen | Mechanik |
 |---|---|---|
 | **A: Repo-Clone** (unten) | Cem / eigene Geräte (VSCode, Terminal) | Clone als `~/.claude/skills/`, Auto-Pull via SessionStart-Hook, inkl. Secret-Guard + Token-Discipline-Setup |
-| **B: Plugin-Marketplace** ([Abschnitt](#nutzung-als-plugin-marketplace--claude-code-web--ohne-clone)) | Kollegen/Boss, Claude Code Web | `/plugin marketplace add Cem-Tas96/claude-skills`, kein Git-Setup nötig |
+| **B: Plugin-Marketplace** ([Abschnitt](#nutzung-als-plugin-marketplace--ohne-clone)) | Kollegen/Boss | CLI/Desktop/VSCode: `/plugin marketplace add Cem-Tas96/claude-skills` · **Web:** Settings-Block im Projekt-Repo (installiert bei jedem Session-Start frisch) |
 
-## Nutzung als Plugin-Marketplace — Claude Code Web / ohne Clone
+## Nutzung als Plugin-Marketplace — ohne Clone
 
-Das Repo ist gleichzeitig ein **Claude Code Plugin-Marketplace** (`.claude-plugin/marketplace.json`). Funktioniert überall wo Plugins unterstützt werden: CLI, Desktop, VS Code-Extension und **Claude Code Web** (claude.ai/code).
+Das Repo ist gleichzeitig ein **Claude Code Plugin-Marketplace** (`.claude-plugin/marketplace.json`).
+
+### CLI / Desktop / VS Code-Extension — per `/plugin`-Befehl
 
 **Installieren (einmalig)** — in Claude Code eingeben:
 
@@ -34,6 +36,30 @@ Alternativ im Terminal: `claude plugin marketplace add Cem-Tas96/claude-skills` 
 ```
 
 **Entfernen:** `/plugin uninstall feature-delivery@claude-skills` bzw. `/plugin marketplace remove claude-skills`.
+
+### Claude Code Web (claude.ai/code) — per Repo-Settings
+
+In Web-Sessions gibt es **kein** `/plugin`-Kommando („/plugin isn't available in this environment", getestet 2026-07). Der dokumentierte Weg für Web: die Plugins im **Projekt-Repo** deklarieren — Web installiert sie dann **bei jedem Session-Start frisch vom Marketplace** (dadurch automatisch immer aktuell).
+
+Diesen Block in `.claude/settings.json` des jeweiligen **Projekt-Repos** committen (Datei anlegen bzw. Felder ergänzen):
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "claude-skills": {
+      "source": { "source": "github", "repo": "Cem-Tas96/claude-skills" }
+    }
+  },
+  "enabledPlugins": {
+    "feature-delivery@claude-skills": true,
+    "feature-testing@claude-skills": true
+  }
+}
+```
+
+- Gilt pro Projekt-Repo und wirkt auf **allen** Flächen (Web, CLI, Desktop, VS Code): Team-Mitglieder bekommen beim Öffnen einmalig einen Trust-/Install-Prompt, danach laden die Skills automatisch.
+- Quelle Web-Verhalten: Claude-Code-Doku „Use Claude Code on the web" — *„Plugins declared in `.claude/settings.json` — Yes. Installed at session start from the marketplace you declared."*
+- Das `enabledPlugins`-Format (`"plugin@marketplace": true`) ist verifiziert — exakt so schreibt es Claude Code selbst bei `claude plugin install`.
 
 > Hinweis für Plugin-Nutzer: Die Skills funktionieren standalone. Cems zusätzliche Clone-Extras (globaler Secret-Guard-Hook, Token-Discipline-Kontext in `~/.claude/CLAUDE.md`) sind Teil des Installer-Wegs A und für die Skill-Nutzung nicht erforderlich — die relevanten Defaults stecken in den Skills selbst.
 
